@@ -1,0 +1,17 @@
+#!/bin/sh
+exec >>/mnt/UPAN/C10_LOGS/install.log 2>&1
+fail() { echo "FAILED: $*"; sync; exit 1; }
+[ "$1" = 0 ] || fail "Updater copy failed: $1"
+@COPY_CHECKS@
+chmod 755 @EXECUTABLES@ || fail 'Cannot set script permissions'
+rm -f /script/c10_aa_resolution.sh /script/c10_aa_resolution.enabled /script/c10_restore_host_geometry.pending || fail 'Cannot remove obsolete experiment files'
+@CLEANUP@
+echo 'SUCCESS: @ACTION@ installed'
+echo 'Reboot before testing. Software version unchanged. USB logs are in C10_LOGS.'
+touch /mnt/UPAN/AATestMode
+if [ -e /mnt/UPAN/A15W_Update.img ]; then
+    mv /mnt/UPAN/A15W_Update.img /mnt/UPAN/@USED@ || fail 'Cannot rename image'
+fi
+echo '@ACTION@ installed; reboot before testing.' > /mnt/UPAN/C10_LOGS/INSTALLED.txt
+sync
+exit 0

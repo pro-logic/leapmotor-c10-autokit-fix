@@ -1,0 +1,18 @@
+#!/bin/sh
+mkdir -p /mnt/UPAN/C10_LOGS || exit 1
+exec >>/mnt/UPAN/C10_LOGS/install.log 2>&1
+echo 'C10 @ACTION@ installer'
+date
+fail() { echo "FAILED: $*"; sync; exit 1; }
+[ "$(cat /etc/box_product_type)" = A15W ] || fail 'Requires A15W'
+[ "$(cat /etc/software_version)" = 2025.10.15.1127 ] || fail 'Requires firmware 2025.10.15.1127'
+[ -x /usr/sbin/riddleBoxCfg ] || fail 'Missing riddleBoxCfg'
+[ ! -e /script/c10_bottom_bar_fix ] || fail 'Different geometry experiment is enabled'
+@BASELINE_CHECKS@
+echo 'Baseline checks passed'
+grep -E 'AndroidAutoWidth|AndroidAutoHeight' /etc/riddle.conf
+rm -f /script/c10_aa_resolution.enabled || fail 'Cannot disable old 720p guard'
+sleep 1
+echo 6 > /tmp/update_progress
+sync
+exit 0

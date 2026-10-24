@@ -1,0 +1,11 @@
+/inputs/
+/dist/
+/.venv/
+__pycache__/
+*.py[cod]
+*.img
+*.used
+*.packed
+*.unpacked
+/C10_LOGS/
+.DS_Store
