@@ -1,5 +1,22 @@
 # C10 AutoKit Fix: instructions for coding agents
 
+## Experimental branch workflow
+
+On `feature/generic-firmware-patcher`, read [docs/GENERIC_PATCHER.md](docs/GENERIC_PATCHER.md)
+first. Stable `main` remains at `6f8cb63085c8e0d650f7f33776819b0b20645d5e`.
+Keep `build.py` and its validated single-firmware path intact. The new `generic.py`
+currently inventories inputs and reports restricted native candidates; it cannot
+emit installable images. Do not promote a candidate match or a matching unpack
+attestation into proof of compatibility. An exact February unpacked driver with
+verified provenance is still missing.
+
+For the generic path, replace fixed pins only with explicit input pairing,
+semantic discovery, audited plans and independent validation. Hashes remain audit
+identities. Two hard-coded version profiles are not completion of the experiment.
+Preserve stable reference outputs under `dist/reference`; use separate ignored
+`dist/generic/<embedded-version>-<image-hash-prefix>/` directories. Do not merge,
+publish or flash as part of this local experiment. Work sequentially.
+
 ## Purpose and scope
 
 Build a **clean stock-to-fixed patch and a paired stock-file unpatch** for the
@@ -36,12 +53,13 @@ distinguishes observed behavior, verified native code and host-side inference.
 
 ## Non-negotiable compatibility boundaries
 
-- A displayed firmware version is insufficient. Pin the original update image,
-  packed driver, exact hardware-unpacked ELF and relevant startup scripts.
+- A displayed firmware version is insufficient. The stable builder pins the
+  original update image, packed driver, exact hardware-unpacked ELF and startup
+  scripts. Generic analysis records identities and refuses unproved semantics.
 - Never make a new firmware pass by changing only a hash or copying old addresses.
   Re-find plaintext Open and AA touch handlers, re-check data flow and ABI, then
-  implement a separately validated firmware profile. Keep existing supported
-  behavior intact if adding another profile.
+  implement independently validated discovery and generation on the experimental
+  branch. Keep existing supported behavior intact.
 - The public installer starts from matching **stock** files. Reinstall and
   partial-copy recovery may accept this same package's known bytes. Do not add
   dependency chains through old development installers or unknown custom firmware.
