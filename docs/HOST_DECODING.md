@@ -6,6 +6,11 @@ and semantic checkpoints. No device access or new hardware capture was needed.
 Generic installable-image generation remains disabled pending the remaining
 proof and packaging gates.
 
+The subsequent [message-CFB checkpoint](MESSAGE_CRYPTO.md) establishes conditional
+Open preprocessing/key/IV evidence and an inactive-state plaintext counterexample
+under explicit import/diagnostic mocks. It does not change this packed-file CBC
+decoding result or establish an unconditional plaintext hook boundary.
+
 ## Exact inputs and decoding result
 
 | Object | Bytes | SHA-256 |

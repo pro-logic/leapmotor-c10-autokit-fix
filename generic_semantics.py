@@ -104,14 +104,20 @@ def preprocessing(context, graph, hook):
             if len(guards) != 1 or guards[0].mnemonic not in ('beq', 'beq.w') or not matches(
                     preceding(helper, guards[0].address, 1), [('cmp.w', 'r8, #0')]):
                 continue
+            from generic_crypto import caller_seed_source, open_cfb_contract
+            contract = open_cfb_contract(context, helper, call)
+            contract['caller_seed_source'] = caller_seed_source(graph, call)
             results.append(dict(call=call, call_dominates_hook=True, input_message_register='r6', direction_argument=0,
                                 helper_graph=helper.summary(), cfb_call=crypto, key_setup_calls=key,
+                                open_cfb_contract=contract,
                                 zero_direction_store_va=direction.address, zero_direction_guard_va=guards[0].address,
                                 checked=['helper receives the same message descriptor before Open dispatch',
                                          'conditional CFB call uses message payload in-place and message length',
                                          'CFB direction stack argument derives from incoming zero'],
-                                unproved=['helper encryption-flag/bypass conditions and caller contracts',
-                                          'cryptographic primitive implementation and key derivation correctness']))
+                                unproved=(['helper marker/bypass/key/IV contract unsupported']
+                                          if contract['status'] == 'unsupported' else []) + [
+                                          'unconditional plaintext at Open, runtime state and caller/outside-entry contracts',
+                                          'cryptographic import implementations and diagnostic callee contract']))
     return results
 
 

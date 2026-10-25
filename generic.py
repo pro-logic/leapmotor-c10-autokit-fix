@@ -98,6 +98,11 @@ def analyze(image, driver=None, receipt=None, kernel=None):
             report['native'] = dict(sha256=sha256(driver), bytes=len(driver), unsupported=str(error), patchable=False)
         if not report['native'].get('unique_candidates'):
             report['blockers'].append('need exactly one supported Open candidate and one touch candidate')
+        for opened in report['native'].get('semantic_evidence', {}).get('open', []):
+            for preprocessing in opened.get('preprocessing', []):
+                contract = preprocessing.get('open_cfb_contract', {})
+                if contract.get('blocker') and contract['blocker'] not in report['blockers']:
+                    report['blockers'].append(contract['blocker'])
         report['blockers'].append('complete control/data-flow, channel, ABI, insertion and independent emulation proof pending')
     report['blockers'].append('stock-derived runtime and paired installer validation pending for generic packaging')
     report['status'] = 'incomplete-analysis; installable output refused'

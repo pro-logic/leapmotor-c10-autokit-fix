@@ -219,7 +219,7 @@ def verify(path, fixture='october'):
                 limits=['Calls stop before actual IPC/HU file writes; HU copy and write setup are separate slices',
                         'AAP link emulation begins after the strcmp gate; its gate is checked statically',
                         'No new patch code generated or emulated; flags/VFP/stack hook preservation remains unproved',
-                        'Full decryption helper conditions/key derivation and outside entries remain unproved',
+                        'Conditional Open CFB contract is separate supporting evidence; unconditional plaintext/caller/outside entries remain unproved',
                         'No new installer/shell/hardware validation'],
                 complete_functional_proof=False, generation_allowed=False, hardware_tested=False)
 

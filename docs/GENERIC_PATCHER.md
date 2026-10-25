@@ -2,6 +2,12 @@
 
 Local checkpoint: 25 October 2026, Australia/Sydney.
 
+Latest continuation: [MESSAGE_CRYPTO.md](MESSAGE_CRYPTO.md) checks both layouts'
+conditional Open CFB behavior and key/IV construction. Encrypted Open with
+inactive crypto state can reach the hook unchanged under explicit callee mocks;
+unconditional plaintext remains unproved. This concrete blocker is now exposed
+in analysis and non-authorizing proof drafts. No generic installer exists.
+
 The branch is `feature/generic-firmware-patcher`, based on stable `main` at
 `6f8cb63085c8e0d650f7f33776819b0b20645d5e`. The stable builder, native patch,
 runtime scripts and packaging are unchanged. No generic installer exists yet.

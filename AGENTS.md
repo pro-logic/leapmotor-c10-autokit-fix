@@ -16,6 +16,10 @@ input blocker: both exact ELFs now reproduce on the host with the audited local
 kernel snapshot, complete checksums and an independent ARM decoder comparison.
 Test-only in-memory hook experiments establish further ABI evidence; they are
 not audited generation plans or installable generic outputs.
+Read [docs/MESSAGE_CRYPTO.md](docs/MESSAGE_CRYPTO.md) for the later conditional
+Open CFB contract. Encrypted Open with inactive crypto state reaches the hook
+unchanged under explicit diagnostic/import mocks; do not promote a dominating
+preprocessing call or a fresh state read into unconditional plaintext proof.
 Do not promote a candidate match, insertion proposal, edited draft or matching unpack
 attestation into proof of compatibility. Host decoding grants verified input
 pairing only when it is actually replayed; a saved receipt alone cannot do so.

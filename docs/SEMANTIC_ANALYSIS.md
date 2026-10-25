@@ -4,6 +4,10 @@ Later result: [HOST_DECODING.md](HOST_DECODING.md) establishes the exact Februar
 ELF, both native-layout checks and in-memory new-hook experiments. The missing-input
 and no-new-hook statements below describe this earlier checkpoint.
 
+[MESSAGE_CRYPTO.md](MESSAGE_CRYPTO.md) subsequently checks the Open helper's
+conditional bypass/key/IV contract for both inputs. Its inactive-state path
+prevents an unconditional plaintext conclusion; full callers remain unproved.
+
 25 October 2026. This advances the experimental generic patcher beyond local
 instruction matches. Generation remains disabled. The complete verified February
 ELF is still unavailable; no substitute has been used.

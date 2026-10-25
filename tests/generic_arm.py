@@ -97,7 +97,7 @@ class Machine:
     def rw_snapshot(self):
         return [self.read(va, size) for va, size in self.writable]
 
-    def run(self, start, stops, mocked_returns=(), limit=6000):
+    def run(self, start, stops, mocked_returns=(), limit=6000, import_handlers=None):
         stops = set(stops)
         mocked = set(mocked_returns)
         self.visited = []
@@ -123,7 +123,9 @@ class Machine:
                 return
             if address in imports:
                 symbol = imports[address]
-                if symbol == 'malloc':
+                if import_handlers and symbol in import_handlers:
+                    import_handlers[symbol](self)
+                elif symbol == 'malloc':
                     self.reg(UC_ARM_REG_R0, self.allocate(self.reg(UC_ARM_REG_R0)))
                 elif symbol == 'free':
                     pointer = self.reg(UC_ARM_REG_R0)
@@ -141,7 +143,8 @@ class Machine:
                     self.reg(UC_ARM_REG_R0, new)
                 else:
                     raise ValueError(f'Unmocked import in semantic slice: {symbol}')
-                self.events.append(dict(target=address, mock='host allocator', symbol=symbol))
+                self.events.append(dict(target=address, mock='explicit import contract' if import_handlers and symbol in import_handlers
+                                        else 'host allocator', symbol=symbol))
                 caller_clobbers()
                 self.reg(UC_ARM_REG_PC, self.reg(UC_ARM_REG_LR))
 

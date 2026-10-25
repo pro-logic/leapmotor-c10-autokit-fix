@@ -14,8 +14,9 @@ from generic_analysis import Driver
 
 HERE = Path(__file__).resolve().parent
 SOURCES = ('generic.py', 'generic_inventory.py', 'generic_analysis.py',
-           'generic_flow.py', 'generic_semantics.py', 'generic_geometry.py',
-           'verify_semantics.py', 'tests/generic_arm.py', 'tests/test_generic_flow.py',
+           'generic_flow.py', 'generic_semantics.py', 'generic_geometry.py', 'generic_crypto.py',
+           'verify_semantics.py', 'verify_message_crypto.py', 'tests/generic_arm.py',
+           'tests/test_generic_flow.py', 'tests/test_generic_crypto.py',
            'generic_packing.py', 'generic_plan.py', 'firmware.py', 'runtime_scripts.py',
            'generic_unpack.py',
            'verify_host_unpack.py', 'tests/test_generic_unpack.py',
@@ -118,7 +119,7 @@ def insertion_layout(data, code_bytes=4096, state_bytes=32):
 
 
 def draft_plan(report, files, driver=None):
-    """Inventory plus candidate sites and explicit empty mandatory proof slots."""
+    """Inventory, bounded supporting evidence and unproved mandatory slots."""
     native = report.get('native', {})
     if native and driver is None:
         raise ValueError('Native bytes are required to bind a draft containing native analysis')
@@ -138,6 +139,13 @@ def draft_plan(report, files, driver=None):
         except ValueError as error:
             proposal = dict(status='unsupported', reason=str(error))
     capabilities = {key: dict(status='unproved', evidence=[]) for key in REQUIRED_PROOFS}
+    for opened in native.get('semantic_evidence', {}).get('open', []):
+        for preprocessing in opened.get('preprocessing', []):
+            contract = preprocessing.get('open_cfb_contract')
+            if contract:
+                capabilities['plaintext-open-after-decryption']['evidence'].append(dict(
+                    kind='bounded conditional message-CFB contract; no unconditional plaintext proof',
+                    contract=contract))
     return dict(schema='c10-proof-draft-v1', status='incomplete; generation refused',
                 patchable=False, generation_allowed=False, hardware_tested=False,
                 image_sha256=report['inventory']['image_sha256'],
@@ -152,7 +160,7 @@ def draft_plan(report, files, driver=None):
                 required_proofs=capabilities,
                 optional_diagnostics=dict(status='unsupported; logger ABI unproved'),
                 insertion_proposal=proposal,
-                evidence_limits='Candidate and arithmetic evidence only; no proof status can be promoted by editing this draft')
+                evidence_limits='Candidate, bounded semantic and arithmetic evidence only; no proof status can be promoted by editing this draft')
 
 
 def validate_draft(draft, report, files, driver=None):
