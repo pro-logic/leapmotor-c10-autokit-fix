@@ -57,20 +57,20 @@ def expected_material(driver, table, seed):
 
 
 def case(data, oracle, seed, active, marker, length, dispatch=False,
-         machine_data=None, patch_state=None, fields=(2560, 1440, 30, 5, 0x4000, 11, 5), kind=1):
+         machine_data=None, patch_state=None, fields=(2560, 1440, 30, 5, 0x4000, 11, 5), kind=1, encrypted_marker=MARKER, plain_marker=0x55aa55aa):
     m = arm.Machine(data if machine_data is None else machine_data)
     key, iv = expected_material(m.driver, oracle['table'], seed)
     plain = struct.pack('<7I', *fields) + bytes(range(36))
     enc = Cipher(algorithms.AES(key), modes.CFB(iv)).encryptor()
     cipher = enc.update(plain) + enc.finalize()
-    supplied = cipher if marker == MARKER else plain
-    expected = plain[:length] + supplied[length:] if marker == MARKER and active > 0 and length else supplied
+    supplied = cipher if marker == encrypted_marker else plain
+    expected = plain[:length] + supplied[length:] if marker == encrypted_marker and active > 0 and length else supplied
     descriptor = struct.pack('<8I', marker, length, kind, 0x11223344, m.payload, 0x22334455, 0x33445566, 0x44556677)
     m.write(m.message, descriptor)
     m.write(m.payload - 16, b'\xa5' * 16 + supplied + b'\x5a' * 16)
     m.word(oracle['active'], active)
     admitted = patch_state is not None and kind == 1 and length == 28 and (
-        marker == MARKER and active > 0 or dispatch and marker == 0x55aa55aa)
+        marker == encrypted_marker and active > 0 or dispatch and marker == plain_marker)
     matching = admitted and fields[:2] == (2560,1440)
     if matching:
         body = bytearray(expected)
@@ -148,8 +148,8 @@ def case(data, oracle, seed, active, marker, length, dispatch=False,
         start, stops = oracle['helper'], (m.stop,)
     m.run(start, stops, (oracle['logger'],), limit=5000,
           import_handlers={'memset': memset, 'AES_set_encrypt_key': set_key, 'AES_cfb128_encrypt': cfb})
-    decrypt = marker == MARKER and active > 0 and length != 0
-    log = marker == MARKER and active <= 0
+    decrypt = marker == encrypted_marker and active > 0 and length != 0
+    log = marker == encrypted_marker and active <= 0
     require(counts == (Counter(memset=2, set_key=1, cfb=1) if decrypt else Counter()),
             'Native decrypt/bypass import trace differs')
     require(sum(e.get('mock') == 'explicit I/O return' for e in m.events) == int(log),

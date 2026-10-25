@@ -1,5 +1,11 @@
 # Channel, storage and incoming-entry continuation
 
+Historical research checkpoint: the later recognized-layout builder is described
+in [GENERIC_PATCHER.md](GENERIC_PATCHER.md). It now generates validated local
+experimental pairs under explicit native ownership/ABI/control-flow contracts.
+The exhaustive proof gaps and earlier refusal statuses below remain research
+limits; they are not claims that the current builder is unavailable.
+
 26 October 2026, Australia/Sydney. Production generation is still refused.
 The current work composes the three-hook plaintext-boundary experiment with
 bounded channel/storage evidence and checks the actual emitted ELF spans.

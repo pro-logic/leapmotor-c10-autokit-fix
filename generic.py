@@ -1,4 +1,4 @@
-"""Experimental A15W inventory and native candidate analysis; no image emission."""
+"""Analyze A15W firmware or build validated experimental C10 patch/unpatch pairs."""
 from __future__ import annotations
 
 import argparse
@@ -118,18 +118,32 @@ def analyze(image, driver=None, receipt=None, kernel=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('analyze', 'extract-driver', 'unpack-driver', 'draft-plan'))
+    parser.add_argument('command', choices=('analyze', 'extract-driver', 'unpack-driver', 'draft-plan', 'build'))
     parser.add_argument('--stock', required=True, type=Path)
     parser.add_argument('--driver', type=Path, help='Candidate exact unpacked ELF; never substitutes another input')
     parser.add_argument('--provenance', type=Path, help='Optional unpack attestation; hash binding is not verification')
     parser.add_argument('--kernel', type=Path, help='Audited local kernel snapshot for reproducible host decoding')
-    parser.add_argument('--output', type=Path, help='New report/draft file, or NEW directory for extract-driver')
+    parser.add_argument('--output', type=Path, help='New report/draft file, or NEW directory for build/extract-driver')
+    parser.add_argument('--shell-tests', action='store_true', help='Build: validate actual paired installers and runtime in disposable Linux/WSL paths')
     args = parser.parse_args()
     try:
+        if args.shell_tests and args.command != 'build':
+            raise ValueError('--shell-tests is supported by build only')
         if args.command == 'extract-driver' and (args.driver or args.provenance or args.kernel):
             raise ValueError('extract-driver accepts only --stock and --output')
         image = read_bounded(args.stock, MAX_IMAGE)
         kernel = read_bounded(args.kernel, 8 * 1024 * 1024) if args.kernel else None
+        if args.command == 'build':
+            if args.provenance:
+                raise ValueError('build does not accept an attestation; --kernel must reproduce native pairing')
+            if kernel is None:
+                raise ValueError('build requires --kernel for reproduced packed-to-native pairing')
+            from generic_build import build
+            driver = read_bounded(args.driver, 16 * 1024 * 1024) if args.driver else None
+            result = build(image, kernel, driver=driver, output=args.output, shell_tests=args.shell_tests,
+                           progress=lambda message: print(message, flush=True))
+            print(json.dumps(result, indent=2))
+            return
         if args.command == 'unpack-driver':
             if kernel is None or args.driver or args.provenance:
                 raise ValueError('unpack-driver requires --kernel; does not accept --driver/--provenance')

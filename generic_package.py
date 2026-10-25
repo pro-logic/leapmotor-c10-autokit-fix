@@ -59,12 +59,13 @@ exit 0
 '''.encode()
 
 
-def _finish(payload, target, undo, baseline, image_sha, version):
+def _finish(payload, target, undo, baseline, image_sha, version, member_modes, driver_mode):
     checks = []
     for member, body in payload.items():
         path = '/' + member
         checks += [_regular(path), f'''[ "$(md5sum {path} | awk '{{print $1}}')" = {md5(body)} ] || fail 'Copy verification failed: {path}' ''']
-    scripts = ' '.join('/' + name for name in payload if name.endswith('.sh'))
+    chmod_scripts = '\n'.join(f"chmod {member_modes[name]:o} /{name} || fail 'Cannot set script permissions'"
+                              for name in payload if name.endswith('.sh'))
     action = 'restore stock files' if undo else 'install from stock'
     used = 'A15W_C10_AutoKit_Generic_Unpatch.used' if undo else 'A15W_C10_AutoKit_Generic_Fix.used'
     cleanup = ''
@@ -78,12 +79,12 @@ exec >> /mnt/UPAN/C10_LOGS/install.log 2>&1
 fail() {{ echo "FAILED: $*"; sync; exit 1; }}
 [ "$1" = 0 ] || fail "Updater copy failed: $1"
 {chr(10).join(checks)}
-chmod 755 {scripts} || fail 'Cannot set script permissions'
+{chmod_scripts}
 [ ! -L {DRIVER}.c10.pending ] || fail 'Pending driver is a symbolic link'
 cp /tmp/c10_native_driver {DRIVER}.c10.pending || fail 'Cannot stage persistent driver'
 {_regular(DRIVER + '.c10.pending')}
 [ "$(md5sum {DRIVER}.c10.pending | awk '{{print $1}}')" = {md5(target)} ] || fail 'Staged driver mismatch'
-chmod 755 {DRIVER}.c10.pending || fail 'Cannot set driver permissions'
+chmod {driver_mode:o} {DRIVER}.c10.pending || fail 'Cannot set driver permissions'
 sync || fail 'Cannot flush staged driver'
 mv -f {DRIVER}.c10.pending {DRIVER} || fail 'Cannot commit driver'
 sync || fail 'Cannot flush committed driver'
@@ -110,11 +111,15 @@ def derive_packages(image, generated_driver):
         raise ValueError('Unsupported generated-driver bounds')
     Driver(generated_driver)
     stock, files = inventory(image)
+    original_modes = {name: int(stock['members'][name]['mode'], 8) for name in (START, DAEMON, DRIVER_MEMBER)}
+    if any(mode not in (0o755, 0o775) for mode in original_modes.values()):
+        raise ValueError('Unsupported stock executable mode; expected755 or775 for exact rollback')
     scripts, script_contract = derive_runtime(files)
     identity = dict(schema='c10-generic-baseline-v1', product=stock['product'], version=stock['version'],
         stock_image_sha256=stock['image_sha256'], packed_driver_sha256=sha256(files[DRIVER_MEMBER]),
         generated_driver_sha256=sha256(generated_driver),
         stock_script_sha256={name: sha256(files[name]) for name in (START, DAEMON)},
+        stock_file_modes=original_modes,
         derived_runtime_sha256={name: sha256(body) for name, body in scripts.items()},
         vehicle_profile='C10 raw2560x1440 effective2560x1296 AA1920x972 DPI220 conditionalAA-Y500')
     identity_text = json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()
@@ -131,8 +136,12 @@ def derive_packages(image, generated_driver):
     for undo in (False, True):
         target = files[DRIVER_MEMBER] if undo else generated_driver
         payload = dict(originals if undo else desired, **{STAGED: target})
-        finish, used = _finish(payload, target, undo, baseline, stock['image_sha256'], stock['version'])
+        member_modes = {name: original_modes.get(name, original_modes[DRIVER_MEMBER] if name == STAGED else 0o755)
+                        for name in payload}
+        finish, used = _finish(payload, target, undo, baseline, stock['image_sha256'], stock['version'],
+                               member_modes, original_modes[DRIVER_MEMBER])
         payload.update({'tmp/once.sh': once, 'tmp/finish.sh': finish})
+        member_modes.update({'tmp/once.sh': 0o755, 'tmp/finish.sh': 0o755})
         # Archive-style names are returned only as in-memory records.
         members = {'./' + name: body for name, body in payload.items()}
         result['unpatch' if undo else 'patch'] = dict(files=members, manifest=dict(
@@ -140,7 +149,9 @@ def derive_packages(image, generated_driver):
             requires_model=stock['product'], requires_version=stock['version'],
             stock_baseline_image_sha256=stock['image_sha256'], original_driver_sha256=sha256(files[DRIVER_MEMBER]),
             driver_sha256=sha256(target), driver_md5=md5(target), used_name=used,
-            members={name: sha256(body) for name, body in members.items()}, member_modes={name: 0o755 for name in members},
+            members={name: sha256(body) for name, body in members.items()},
+            member_modes={'./' + name: mode for name, mode in member_modes.items()},
+            stock_file_modes=original_modes, persistent_driver_mode=original_modes[DRIVER_MEMBER],
             minimum_free_root_kib=minimum, requires_reboot=True, one_time_installation_receipt=True,
             installer_preserves_AATestMode=True, preserves_settings_logs_and_unrelated_files=True,
             runtime_digest='md5sum for stock utility compatibility; SHA256 identities in host manifest/provenance',

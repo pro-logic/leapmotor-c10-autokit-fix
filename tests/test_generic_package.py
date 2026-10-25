@@ -1,17 +1,28 @@
 """Per-input paired installer identities and conservative payload scope."""
 import json
+import io
+import tarfile
 import unittest
 
-from firmware import sha256
+from firmware import crypt, read_archive, sha256
 from generic_package import derive_packages
 from generic_runtime import START, DAEMON
 from tests.test_generic import archive, native_fixture
 from tests.test_generic_runtime import fixture
 
 
-def stock(extra=b'fixture-original-packed-driver'):
+def stock(extra=b'fixture-original-packed-driver', modes=None):
     data = fixture()
-    return archive(overrides={**data, 'usr/sbin/ARMadb-driver': extra})
+    image = archive(overrides={**data, 'usr/sbin/ARMadb-driver': extra})
+    if modes is None:
+        return image
+    _, members, bodies = read_archive(image)
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode='w:gz', format=tarfile.USTAR_FORMAT) as output:
+        for member in members:
+            member.mode = modes.get(member.name, member.mode)
+            output.addfile(member, io.BytesIO(bodies[member.name]))
+    return crypt(stream.getvalue(), decrypt=False)
 
 
 class GenericPackageTests(unittest.TestCase):
@@ -69,6 +80,22 @@ class GenericPackageTests(unittest.TestCase):
         image = archive(overrides={START: b'spawn ARMadb-driver\n', DAEMON: fixture()[DAEMON]})
         with self.assertRaises(ValueError):
             derive_packages(image, native_fixture())
+
+    def test_observed_stock_executable_modes_are_preserved_and_others_refuse(self):
+        names = (START, DAEMON, 'usr/sbin/ARMadb-driver')
+        for mode in (0o755, 0o775):
+            pair = derive_packages(stock(modes={name: mode for name in names}), native_fixture())
+            for role in ('patch', 'unpatch'):
+                item = pair[role]
+                for name in (START, DAEMON):
+                    self.assertEqual(item['manifest']['member_modes']['./' + name], mode)
+                    self.assertIn(f'chmod {mode:o} /{name}', item['files']['./tmp/finish.sh'].decode())
+                self.assertEqual(item['manifest']['member_modes']['./tmp/c10_native_driver'], mode)
+                self.assertEqual(item['manifest']['persistent_driver_mode'], mode)
+                self.assertIn(f'chmod {mode:o} /usr/sbin/ARMadb-driver.c10.pending', item['files']['./tmp/finish.sh'].decode())
+        for name in names:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unsupported stock executable mode'):
+                derive_packages(stock(modes={name: 0o644}), native_fixture())
 
 
 if __name__ == '__main__':

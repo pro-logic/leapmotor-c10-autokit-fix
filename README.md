@@ -1,9 +1,11 @@
 # C10 AutoKit Fix
 
 This checkout's **`feature/generic-firmware-patcher`** branch also contains an
-experimental, **analysis-only** entry point. See [docs/GENERIC_PATCHER.md](docs/GENERIC_PATCHER.md)
-for commands, results and outstanding work. It does not yet generate generic
-patch/unpatch images. The single-firmware builder below is unchanged.
+experimental builder for structurally recognized A15W firmware. It reproduces
+the input's native driver, discovers compatible code/script layouts, validates
+the generated code, and builds a paired patch/unpatch. See
+[docs/GENERIC_PATCHER.md](docs/GENERIC_PATCHER.md) for the command and compatibility
+contract. The original single-firmware builder below is unchanged.
 
 Resolution and touch fix for the **Carlinkit / MagicBox CPC200-CCPA (A15W)**
 dongle on a **Leapmotor C10**. Build one clean patch from matching **stock

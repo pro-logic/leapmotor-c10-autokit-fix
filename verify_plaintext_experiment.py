@@ -11,7 +11,8 @@ import struct
 from unicorn import arm_const as regs
 
 from firmware import sha256
-from generic_analysis import analyze_driver
+from generic_analysis import Driver, analyze_driver
+from generic_crypto import plain_packet_marker
 from generic_plan import HERE, SOURCES
 from tests.generic_arm import Machine
 from tests.native_experiment import experiment
@@ -23,13 +24,16 @@ from verify_semantics import require
 def relay_checks(original, changed, native, state):
     contract = native['semantic_evidence']['open'][0]['preprocessing'][0]['open_cfb_contract']
     site = contract['cfb_call']['va']
+    marker_value = contract['encrypted_flag']['encrypted_marker']
+    initializer = native['semantic_evidence']['geometry_consumers']['type1_response'][0]['initializer_target']
+    plain = plain_packet_marker(Driver(original), initializer)['marker']
     total = 0
     # Check post-import flags/control state independently of the call's allowed
     # caller clobbers. The stub must preserve exactly what the primitive returned.
-    vectors = ((0,1,28,MARKER,2560,1440), (0,1,28,MARKER,2560,1296),
-               (0,1,28,MARKER,1920,1080), (1,1,28,MARKER,2560,1440),
-               (0,2,28,MARKER,2560,1440), (0,1,27,MARKER,2560,1440),
-               (0,1,28,0x55aa55aa,2560,1440), (0,1,29,MARKER,2560,1440))
+    vectors = ((0,1,28,marker_value,2560,1440), (0,1,28,marker_value,2560,1296),
+               (0,1,28,marker_value,1920,1080), (1,1,28,marker_value,2560,1440),
+               (0,2,28,marker_value,2560,1440), (0,1,27,marker_value,2560,1440),
+               (0,1,28,plain,2560,1440), (0,1,29,marker_value,2560,1440))
     for seed in range(32):
         for direction,kind,length,marker,width,height in vectors:
             old,new = Machine(original),Machine(changed)
@@ -70,7 +74,7 @@ def relay_checks(original, changed, native, state):
             require([old.reg(r) for r in VFP] == [new.reg(r) for r in VFP],'Observer changed returned VFP state')
             for r in (regs.UC_ARM_REG_FPSCR,regs.UC_ARM_REG_FPEXC):
                 require(old.reg(r)==new.reg(r),'Observer changed returned VFP control state')
-            admitted=direction==0 and kind==1 and length==28 and marker==MARKER
+            admitted=direction==0 and kind==1 and length==28 and marker==marker_value
             matching=admitted and (width,height)==(2560,1440)
             require(new.word(state)==(int(matching) if admitted else seed&1),'Observer gate differs')
             require(new.word(new.payload+4)==(1296 if matching else height),'Observer profile differs')
