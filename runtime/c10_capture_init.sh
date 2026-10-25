@@ -22,15 +22,15 @@ fi
 [ -e "$ENABLED" ] || exit 0
 
 exec >> /tmp/c10_capture_init.log 2>&1
-echo 'C10 stage 13: USB+AATestMode enabled diagnostics for this boot; stage12 fix retained'
+echo 'C10 AutoKit Fix: USB+AATestMode enabled diagnostics for this boot'
 date
 cat /proc/uptime
 /script/c10_usb_capture.sh >> /tmp/c10_usb_capture.log 2>&1 &
-echo '[C10-stage13] persistent driver:'
+echo '[C10-AutoKit-Fix] persistent driver:'
 md5sum /usr/sbin/ARMadb-driver
 (
     sleep 12
-    echo '[C10-stage13] executable hashes after startup:'
+    echo '[C10-AutoKit-Fix] executable hashes after startup:'
     for pid in $(pidof ARMadb-driver 2>/dev/null); do
         echo "PID $pid executable:"
         readlink /proc/$pid/exe

@@ -9,7 +9,8 @@ DAEMON = './script/phone_link_deamon.sh'
 LAUNCH = './script/c10_start_androidauto_972.sh'
 INIT = './script/c10_capture_init.sh'
 LOGGER = './script/c10_usb_capture.sh'
-PROVENANCE = './script/c10_usb_boot_logging.baseline'
+PROVENANCE = './script/c10_autokit_fix.baseline'
+BASELINE = b'c10-autokit-fix:2025.10.15.1127:stock\n'
 STAGED = './tmp/c10_native_driver'
 DRIVER = '/usr/sbin/ARMadb-driver'
 DRIVER_MEMBER = '.' + DRIVER
@@ -20,8 +21,8 @@ PINS = {
     START: 'e3940344a98c3e4a7321b11eab98d7b5c2a980500215b25f0812896b34c6ed83',
     DAEMON: '39e259a10da4623cd577f927c812efe966a5befa37ae4b1d164cd9d85bc678f8',
     LAUNCH: '47e383b6f7601d64214e7d70fd515ee59e0f26fedf6e9b7fa71a9476f19baf14',
-    INIT: '5e57e33704717da64092ff4d894686b47b8606fe551d5ae2e02fe72ef726a451',
-    LOGGER: 'a8ad0f68c8b2cf735137795b6ed57c53f2e395c5e2464cfa3b6b08ac9e4f091d',
+    INIT: '3c1c5c2d4f13e20cd6a899173a2975e2b1a2c46287fd67791ba499ed0b0b8261',
+    LOGGER: '412a062a3937c69e59ec570939c60d116026a673cd132d47ebace116b1f8a326',
 }
 
 
@@ -48,7 +49,7 @@ def runtime(stock):
 \t\t\t\t/script/c10_start_androidauto_972.sh >> /dev/null 2>&1
 \t\t\tfi
 ''')
-    # Ordering intentionally matches the original stage13 overlay.
+    # Keep a deterministic archive order.
     scripts = {START: start}
     for name in (INIT, LOGGER):
         scripts[name] = (HERE / 'runtime' / Path(name).name).read_bytes()
@@ -56,5 +57,5 @@ def runtime(stock):
     scripts[LAUNCH] = (HERE / 'runtime' / Path(LAUNCH).name).read_bytes()
     for name, data in scripts.items():
         if sha256(data) != PINS[name]:
-            raise ValueError(f'v13 runtime bytes differ from the reference: {name}')
+            raise ValueError(f'C10 AutoKit Fix runtime bytes differ from the reference: {name}')
     return scripts

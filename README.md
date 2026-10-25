@@ -1,7 +1,8 @@
-# Leapmotor C10: v13 Android Auto touch fix
+# C10 AutoKit Fix
 
-Build a small USB patch and its paired unpatch for the **Carlinkit / MagicBox
-CPC200-CCPA (A15W)** dongle on a **Leapmotor C10**.
+Resolution and touch fix for the **Carlinkit / MagicBox CPC200-CCPA (A15W)**
+dongle on a **Leapmotor C10**. Build one clean patch from matching **stock
+firmware**, and a paired unpatch that restores the stock files it replaces.
 
 This project was **vibe-coded with AI**. It is experimental, supplied **as is,
 with no warranty**, and is not supported by Leapmotor, Carlinkit or MagicBox.
@@ -21,11 +22,11 @@ This patch targets that specific profile; it is not a universal touch calibratio
 
 It grew out of work based on
 [lvalen91/CPC200-CCPA_resources](https://github.com/lvalen91/CPC200-CCPA_resources).
-The standalone v13 implementation here includes subsequent local work; this does
+The standalone implementation here includes subsequent local work; this does
 not imply the upstream author wrote, reviewed or endorsed it. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for credits and input provenance.
 
-## What v13 does
+## What the patch does
 
 - Keeps Android Auto content at 1920×972 and AA-side DPI at 220 using the existing
   session guard (100 ms polling while AA runs).
@@ -50,18 +51,17 @@ firmware version alone is insufficient. Other adapters and C10 software versions
 have not been established as compatible. The observed AutoKit version was
 `2024.08.06.1042`.
 
-On the development dongle, v12 needed Show once immediately after installation;
-two subsequent cold boots then had correct touch without Show. The v13 upgrade
-was installed and the owner reported a successful morning test on 25 October
-2026. The USB/logging mode and cold-boot details for that report were unspecified.
-**The fresh-stock installer generated here has passed local tests but has not
+On the development dongle, the combined touch fix initially needed Show once;
+two subsequent cold boots then had correct touch without Show. After the
+boot-gated logging change, the owner reported a successful morning test on
+25 October 2026. The USB/logging mode and cold-boot details for that report were
+unspecified. **The clean-stock installer generated here has passed local tests but has not
 been separately installed on hardware.** See [docs/VALIDATION.md](docs/VALIDATION.md).
 
-The number 13 is the development revision, not thirteen updates you must install.
-These builders go directly from matching stock files to the complete v13 fix.
-Do not apply this community variant to a development dongle using the separate
-v12→v13 scripts-only upgrade: the installer checks its baseline/provenance and
-will reject that path. Keep that development upgrade's own rollback.
+**Stock firmware → C10 AutoKit Fix → optional unpatch to stock files.** No earlier
+experimental patches are required or supported. Reinstall and recovery from a
+partial installation of this same package are supported. Other modified firmware
+and previous development installers are rejected; retain their own rollback.
 
 ## Inputs you supply
 
@@ -114,7 +114,7 @@ Outputs:
 
 | File | Purpose |
 | --- | --- |
-| `dist/patch/A15W_Update.img` | Complete v13 overlay for the matching stock baseline |
+| `dist/patch/A15W_Update.img` | Complete C10 AutoKit Fix overlay for the matching stock baseline |
 | `dist/unpatch/A15W_Update.img` | Paired rollback restoring the original packed driver and two startup scripts |
 | `dist/patch/manifest.json`, `dist/unpatch/manifest.json` | Actual image and member hashes |
 | `dist/validation.json` | ARM validation results and the input/output hashes |
@@ -123,7 +123,9 @@ The build writes files locally; it does not connect to or flash a dongle. No
 earlier experimental images, log captures, absolute workspace paths or sibling
 repositories are needed. Compression can vary with Python/zlib, so use your
 generated manifests for your image hashes; the driver and runtime payloads are
-pinned to the original v13 bytes.
+pinned to the validated reference. The native touch driver and AA guard retain
+their tested bytes; the public package uses the project name in its receipts,
+diagnostic labels and provenance marker.
 
 ## Additional verification
 
@@ -151,7 +153,7 @@ python -m unittest discover -s tests -p "test_*.py"
    that filename. Use the dongle's normal USB update procedure. Do this parked
    with stable power. The installer requires at least 640 KiB of free root space.
 3. Check `C10_LOGS/INSTALLED.txt` and `C10_LOGS/install.log` on the stick for the
-   successful `stage13 fresh-stock USB boot logging` action. The ordinary updater
+   successful `C10 AutoKit Fix: install from stock` action. The ordinary updater
    screen alone does not prove the finish script succeeded. Reboot before testing.
 4. For a normal run, boot without USB or without `AATestMode`. Test touch before
    pressing Show, including after another full cold boot.
@@ -165,16 +167,25 @@ python -m unittest discover -s tests -p "test_*.py"
 
 The patch does not create `AATestMode` automatically. Installation itself writes
 a one-time receipt independently of runtime diagnostic mode. Completed installers
-rename their USB input to `A15W_C10_13_Stock.used` or
-`A15W_C10_13_Stock_Rollback.used`.
+rename their USB input to `A15W_C10_AutoKit_Fix.used` or
+`A15W_C10_AutoKit_Unpatch.used`.
 
 Unpatch restores the original packed projection driver and startup/daemon files,
-and removes the v13 guard/capture helpers and provenance file it owns. It preserves
+and removes this project's guard/capture helpers and provenance file it owns. It preserves
 user settings, the USB marker, old logs and unrelated historical artifacts. It
 does not factory-reset configuration: existing Android Auto resolution settings
 are left for the stock host/driver to manage on the next boot. Neither image
 replaces the kernel, boot partition, rootfs image or AutoKit APK; the displayed
 firmware version remains unchanged.
+
+## Future firmware and agent instructions
+
+[AGENTS.md](AGENTS.md) gives coding agents the scope, code map and validation
+rules. [docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md) records the
+investigation, rejected hypotheses, exact current hook locations, host-side
+geometry clues and a procedure for investigating a new firmware revision.
+The included read-only inspector helps locate code and strings in a new driver.
+New firmware requires fresh analysis; changing a hash pin alone is not a port.
 
 ## Licence
 

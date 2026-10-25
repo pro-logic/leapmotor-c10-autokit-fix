@@ -60,7 +60,7 @@ def elf_check(original,patched,manifest):
 def machine(data,seed=0):
     uc,areas=harness.machine(data,(2560,1440,30,5,0x4000,11,5),28,seed)
     if len(data)>478664:
-        # Only stage 12 has these bytes inside PT_LOAD memsz. The page itself
+        # Only the combined touch fix has these bytes inside PT_LOAD memsz. The page itself
         # is mapped for both images, but stock initial state must not be reused.
         uc.mem_write(build.STATE,bytes(32))
     uc.reg_write(UC_ARM_REG_C1_C0_2,0x00f00000)
@@ -150,12 +150,12 @@ def verify(original,patched):
     try: build.patch(original[:-1]+bytes([original[-1]^1]))
     except ValueError: pass
     else: raise AssertionError('Unknown source accepted')
-    stage11=build.base.patch(original)[0]
-    assert build.base.sha(stage11)=='13c930235120c5bb1e36df5c6fa8bad46b8feb4e21bb17c52500ee18f33a0d0a'
+    open_only=build.base.patch(original)[0]
+    assert build.base.sha(open_only)=='13c930235120c5bb1e36df5c6fa8bad46b8feb4e21bb17c52500ee18f33a0d0a'
     open_cases=0
     for seed in range(32):
         for width,height,length in ((2560,1440,28),(2560,1296,28),(1920,1440,28),(2560,1080,28),(0,0,28),(2560,1440,0),(2560,1440,27),(2560,1440,29)):
-            old,oldareas=machine(stage11,seed)
+            old,oldareas=machine(open_only,seed)
             new,newareas=machine(patched,seed)
             do_open(old,width,height,length); do_open(new,width,height,length)
             assert [old.reg_read(r) for r in REGS]==[new.reg_read(r) for r in REGS]

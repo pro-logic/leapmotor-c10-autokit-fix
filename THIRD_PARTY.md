@@ -5,7 +5,7 @@
 Based on [lvalen91/CPC200-CCPA_resources](https://github.com/lvalen91/CPC200-CCPA_resources),
 MIT, copyright 2025 lvalen91. The development checkout started from commit
 `b82b38249cc551390512d96f85c372107d678c1d` and contained subsequent local C10
-work. The v13 changes are not claimed to be present at that upstream commit.
+work. The combined fix is not claimed to be present at that upstream commit.
 Its copyright and licence are retained in this repository's LICENSE.
 
 The native patch and validators, A15W archive format code, installer templates,

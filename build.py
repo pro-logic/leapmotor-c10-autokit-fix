@@ -1,4 +1,4 @@
-"""Build the v13 community patch/unpatch from explicit user-supplied originals."""
+"""Build C10 AutoKit Fix and its stock-file unpatch from supplied originals."""
 from __future__ import annotations
 
 import argparse
@@ -32,7 +32,7 @@ def inputs(stock_path, driver_path):
         raise ValueError('Original packed driver differs')
     patched, blob, sources, chunks, hooks = driver_patch.patch(original)
     if sha256(patched) != PATCHED_SHA:
-        raise ValueError('Patched driver differs from the exact stage12/v13 reference')
+        raise ValueError('Patched driver differs from the validated reference')
     current = {**runtime(stock), STAGED: patched}
     return original, stock, current
 
@@ -51,7 +51,7 @@ def build(stock_path, driver_path, output):
         inputs={'stock_sha256': STOCK_SHA, 'unpacked_driver_sha256': sha256(original)},
         functional_guard_sha256=sha256(current[LAUNCH]),
         images={m['output']: m['output_sha256'] for m in manifests},
-        hardware_evidence='Existing dongle upgrade reported working 2026-10-25; fresh-stock installer untested',
+        hardware_evidence='Native fix worked on development dongle; clean-stock package remains hardware-untested',
     )
     (output / 'validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     return report, stock, current, manifests

@@ -30,7 +30,7 @@ geometry() {
     done
 }
 {
-    echo 'C10 stage13 USB-armed boot capture: exact stage12 driver, V2 guard and AA220'
+    echo 'C10 AutoKit Fix: USB-armed boot capture; 1920x972 guard and AA DPI220'
     if [ "$duration" -eq 0 ]; then
         echo 'Continuous capture/size bounding for this diagnostic boot'
     else

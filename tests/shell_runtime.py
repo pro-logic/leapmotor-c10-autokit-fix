@@ -17,7 +17,7 @@ DAEMON='./script/phone_link_deamon.sh'
 LAUNCH='./script/c10_start_androidauto_972.sh'
 INIT='./script/c10_capture_init.sh'
 LOGGER='./script/c10_usb_capture.sh'
-PROV='./script/c10_usb_boot_logging.baseline'
+PROV='./script/c10_autokit_fix.baseline'
 STAGED='./tmp/c10_native_driver'
 DRIVER='./usr/sbin/ARMadb-driver'
 
@@ -99,19 +99,20 @@ def stop(process):
 
 def install_tests(parent,current,stock,images):
     checks=[]
-    for profile in ('fresh-stock',):
+    for marker_present in (False,True):
+        profile='stock'
         candidate=next(i for i in images if i['manifest']['profile']==profile and not i['manifest']['rollback'])
         rollback=next(i for i in images if i['manifest']['profile']==profile and i['manifest']['rollback'])
-        fs=FS(parent/('install-'+profile))
-        baseline={START:stock[START],DAEMON:stock[DAEMON]} if profile=='fresh-stock' else {n:b for n,b in current.items() if n.startswith('./script/')}
+        fs=FS(parent/('install-'+profile+str(marker_present)))
+        baseline={START:stock[START],DAEMON:stock[DAEMON]}
         for name,body in baseline.items(): fs.write(name,body)
-        driver_before=stock[DRIVER] if profile=='fresh-stock' else current[STAGED]
+        driver_before=stock[DRIVER]
         driver=fs.write(DRIVER,driver_before)
         fs.write('mnt/UPAN/C10_LOGS/historical.txt',b'preserve evidence')
         fs.write('script/c10_aa_resolution.sh',b'dormant historical artifact')
         fs.write('script/c10_restore_host_geometry.pending',b'preserve dormant artifact')
         marker=fs.path('mnt/UPAN/AATestMode')
-        if profile=='upgrade12': marker.write_bytes(b'preserve marker content')
+        if marker_present: marker.write_bytes(b'preserve marker content')
         marker_before=marker.read_bytes() if marker.exists() else None
         once=candidate['files']['./tmp/once.sh']; finish=candidate['files']['./tmp/finish.sh']
         for name,bad,good in (('etc/box_product_type',b'other',b'A15W'),('etc/software_version',b'other',b'2025.10.15.1127')):
@@ -131,15 +132,14 @@ def install_tests(parent,current,stock,images):
         first=next(n for n in candidate['files'] if n.startswith('./script/'))
         fs.write(first,b'corrupt'); assert fs.run(finish,'0').returncode!=0; fs.write(first,candidate['files'][first])
         fs.write('fail-chmod',b''); assert fs.run(finish,'0').returncode!=0; fs.path('fail-chmod').unlink()
-        if profile=='fresh-stock':
-            for failure in ('fail-copy','corrupt-copy','fail-sync','fail-move'):
-                fs.write(failure,b'')
-                assert fs.run(finish,'0').returncode!=0,failure
-                assert driver.read_bytes()==driver_before,failure
-                assert image.exists(),failure
-                fs.path(failure).unlink()
-                pending=fs.path(DRIVER+'.c10.pending')
-                if pending.exists(): pending.unlink()
+        for failure in ('fail-copy','corrupt-copy','fail-sync','fail-move'):
+            fs.write(failure,b'')
+            assert fs.run(finish,'0').returncode!=0,failure
+            assert driver.read_bytes()==driver_before,failure
+            assert image.exists(),failure
+            fs.path(failure).unlink()
+            pending=fs.path(DRIVER+'.c10.pending')
+            if pending.exists(): pending.unlink()
         result=fs.run(finish,'0')
         assert result.returncode==0,result.stderr
         assert driver.read_bytes()==current[STAGED]
@@ -147,18 +147,16 @@ def install_tests(parent,current,stock,images):
         assert (marker.read_bytes() if marker.exists() else None)==marker_before
         assert fs.path('etc/riddle.conf').read_bytes()==configuration
         assert fs.run(once).returncode==0 and fs.run(rollback['files']['./tmp/once.sh']).returncode==0
-        fs.write(PROV,b'upgrade12\n')
+        fs.write(PROV,b'other-project\n')
         assert fs.run(rollback['files']['./tmp/once.sh']).returncode!=0,'Wrong rollback provenance accepted'
-        fs.write(PROV,b'stock\n')
-        if profile=='upgrade12': assert STAGED not in candidate['files']
+        fs.write(PROV,candidate['files'][PROV])
         fs.copy(rollback['files']); image.write_bytes(b'mock rollback')
         result=fs.run(rollback['files']['./tmp/finish.sh'],'0')
         assert result.returncode==0,result.stderr
         assert driver.read_bytes()==driver_before
         for name,body in baseline.items(): assert fs.path(name).read_bytes()==body
         assert not fs.path(PROV).exists()
-        if profile=='fresh-stock':
-            assert not any(fs.path(n).exists() for n in (LAUNCH,INIT,LOGGER))
+        assert not any(fs.path(n).exists() for n in (LAUNCH,INIT,LOGGER))
         assert fs.path('script/c10_aa_resolution.sh').read_bytes()==b'dormant historical artifact'
         assert fs.path('script/c10_restore_host_geometry.pending').read_bytes()==b'preserve dormant artifact'
         assert fs.path('mnt/UPAN/C10_LOGS/historical.txt').read_bytes()==b'preserve evidence'
@@ -314,7 +312,7 @@ def main():
     for image in images:
         for name,body in image['files'].items():
             if name.endswith('.sh'): subprocess.run(['/bin/sh','-n'],input=body,check=True,capture_output=True)
-    payload=next(i['files'] for i in images if i['manifest']['profile']=='fresh-stock' and not i['manifest']['rollback'])
+    payload=next(i['files'] for i in images if i['manifest']['profile']=='stock' and not i['manifest']['rollback'])
     results=install_tests(parent,current,stock,images)+runtime_tests(parent,payload)
     print(json.dumps(dict(environment='Linux, real /bin/sh processes and signals; all paths relocated into disposable workspace',checks=results)))
 

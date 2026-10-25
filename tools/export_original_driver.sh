@@ -4,7 +4,7 @@ set -eu
 fail() { echo "Export failed: $*" >&2; exit 1; }
 SOURCE=/usr/sbin/ARMadb-driver
 TOOL=/mnt/UPAN/C10_TOOLS/c10_upx
-WORK=/tmp/c10-v13-original-export
+WORK=/tmp/c10-autokit-original-export
 DEST=/mnt/UPAN/C10_ORIGINAL_DRIVER
 [ "$(cat /etc/box_product_type)" = A15W ] || fail 'Requires A15W'
 [ "$(cat /etc/software_version)" = 2025.10.15.1127 ] || fail 'Requires 2025.10.15.1127'

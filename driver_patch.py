@@ -1,6 +1,6 @@
-"""Stage 12: gated AA touch shift, preserving the stage 11 Open correction.
+"""Gated AA touch shift, preserving the validated Open correction.
 
-Diagnostic hypothesis, not a measured 72-pixel calibration. Only raw host Open
+Empirical correction, not a measured 72-pixel calibration. Only raw host Open
 2560x1440 arms the shift. A raw 2560x1296 Open (Show profile) disarms it.
 """
 from __future__ import annotations
@@ -116,8 +116,8 @@ bypass:
 
 
 def patch(data):
-    # Reuse the original source pin/layout validation, without rewriting stage 11.
-    stage11,_,_=base.patch(data)
+    # Reuse the original source pin/layout validation, without changing the reference Open algorithm.
+    open_only,_,_=base.patch(data)
     h,ph,sections=base.headers(data)
     rw=[p for p in ph if p[0]==1 and p[6]==6][0]
     if rw[2]+rw[5]!=STATE: raise ValueError('Unexpected original BSS end')
@@ -125,7 +125,7 @@ def patch(data):
         if data[va-0x10000:va-0x10000+4]!=before:
             raise ValueError(f'Unexpected hook bytes at {va:#x}')
     blob,sources,chunks=make_code(data)
-    result=bytearray(stage11)
+    result=bytearray(open_only)
     result[base.INSERT:base.INSERT+base.GAP]=blob+bytes(base.GAP-len(blob))
     patches={base.HOOK:base.assemble(f'b.w {OPEN:#x}',base.HOOK),
              TOUCH_HOOK:base.assemble(f'b.w {TOUCH:#x}',TOUCH_HOOK),

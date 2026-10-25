@@ -25,19 +25,24 @@ the shell fixtures.
 - **PASS** real shell install/reinstall/rollback/reapply; unknown model, firmware,
   script, driver, provenance and low-space rejection; copy/corruption/chmod/sync/
   rename failures; preservation of configuration, marker and historical files.
+  Stock install/unpatch/reapply was exercised both with and without a pre-existing
+  AATestMode file.
 - **PASS** no USB, USB without marker, unmounted marker, directory marker,
   diagnostic boot, mount settling and timeout; actual AA/driver redirection;
   AA guard exit status and TERM forwarding; fixed boot mode after USB changes.
 - **PASS** durable USB snapshot publication, three-snapshot retention, failed
   flush withholding and log bounding beyond the former 1800-iteration limit.
+- **PASS** read-only inspector on the original Open handler, relevant string
+  locations and rejection of a disassembly range backed only by BSS.
 
-The two generated reference images are byte-identical to the community
-fresh-stock images prepared during v13 development:
+The native driver and AA guard match the tested development bytes. The public
+stock-only package has updated project labels, receipts and provenance; its
+image hashes are recorded below after rebuilding and exercising its installers:
 
 | Output | Bytes | SHA-256 |
 | --- | ---: | --- |
-| Patch | 274257 | `68f06c469458931c6c63247acf6a92d0239da5d8368f480f56a3ac856cfd84eb` |
-| Unpatch | 220914 | `ef340f9bbe381ebdb9106e2fc26d13dbfdbf5ef449eb346ae3abb18861f38609` |
+| Patch | 274203 | `fbfa6226cf8e364f2bda352cd9ef255f2e0ecfd5b61a7e2ee532ad3b82d354fb` |
+| Unpatch | 220863 | `6de11c46e740945c4e0cc93f340409cc358ba84380914bdf71893dd034cad0cf` |
 
 Patched driver SHA-256:
 `0bed061a46ab214b2fa4c3b57c548e01e1f9a814f56295962035153651114d95`.
@@ -56,12 +61,12 @@ cold car boots after Show was used once following installation. A readable later
 capture confirmed the expected running driver and active correction. This does
 not explain the initially unsuccessful post-install session.
 
-The same dongle was upgraded to v13's scripts-only diagnostic mode change on
-24 October. On 25 October the owner reported that v13 worked fine that morning.
+The same dongle received the scripts-only boot-gated diagnostic change on
+24 October. On 25 October the owner reported that the result worked fine that morning.
 That report did not specify USB/marker status, Show use or cold-boot count, and
-no v13 capture was supplied at the time of this document.
+no later diagnostic capture was supplied at the time of this document.
 
-The community fresh-stock installer and rollback generated here **have not been
+The clean-stock installer and unpatch generated here **have not been
 separately exercised on hardware**. The manual original-driver exporter is also
 not newly hardware-tested. The test suite does not emulate the full OS, USB
 timing, Android AutoKit Views, flash power loss or different vehicles. Previous

@@ -11,7 +11,7 @@ different driver. The packed stock driver's SHA-256 is
 
 This procedure requires existing shell access to a matching original A15W dongle.
 Adding shell/SSH access is outside this repo's scope. It will refuse a driver
-already replaced by v12/v13; do not restore your working dongle merely to obtain
+already replaced by a native patch; do not restore your working dongle merely to obtain
 another copy if you already have a matching original export.
 
 1. Obtain `Debug_Tools/upx` from

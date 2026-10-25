@@ -11,7 +11,6 @@ fail() { echo "FAILED: $*"; sync; exit 1; }
 @BASELINE_CHECKS@
 echo 'Baseline checks passed'
 grep -E 'AndroidAutoWidth|AndroidAutoHeight' /etc/riddle.conf
-rm -f /script/c10_aa_resolution.enabled || fail 'Cannot disable old 720p guard'
 sleep 1
 echo 6 > /tmp/update_progress
 sync
