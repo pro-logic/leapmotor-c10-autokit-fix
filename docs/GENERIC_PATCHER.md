@@ -74,7 +74,23 @@ packing verifier is under ignored `dist/generic/research-20261025/`. Stable
 source and reference artifacts remain unchanged. Full functional proofs,
 new generation and paired generic installers remain incomplete.
 
-## Implemented boundaries
+## Bounded semantic evidence
+
+The next continuation adds recursive Thumb traversal within ELF unwind ranges,
+ELF-backed ARM PLT/import resolution, bounded dominance and incoming-edge checks,
+derived touch channel/stack routing and four separate geometry consumer checks.
+See [SEMANTIC_ANALYSIS.md](SEMANTIC_ANALYSIS.md) for proof scope, annotations,
+adversarial fixtures and reproduction commands.
+
+The independent original-path verifier passes seven Open cases, sixteen geometry
+cases, three RemoteCxCy guard cases and 432 native touch-dispatch cases. Native
+packet object code runs; allocator/diagnostic I/O boundaries are mocked and IPC
+stops before external I/O. These are new **unmodified-path** emulation checks,
+not new hook generation, installer shell simulation or hardware evidence.
+All 33 source tests pass. Mandatory full proof slots remain unproved and both
+`patchable` and `generation_allowed` remain false.
+
+## Inventory and candidate boundaries
 
 `generic_inventory.py` reads the encrypted archive in memory with input,
 decompression and member-count limits. It validates normalized paths, duplicate
@@ -98,7 +114,7 @@ unsupported; no first-match selection occurs.
 
 This grammar still restricts registers and compiler layout. It is a first
 candidate detector, **not completed version-independent semantic recognition**.
-It does not prove that an Open candidate is reached after decryption, all
+Its newer bounded supporting evidence does not complete proof of decryption, all
 incoming edges, downstream geometry consumers, AA channel selection, stack/ABI
 facts, register liveness, logger ABI or a safe insertion layout. These missing
 facts appear as blockers; no candidate is an audited patch plan.

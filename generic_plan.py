@@ -14,6 +14,8 @@ from generic_analysis import Driver
 
 HERE = Path(__file__).resolve().parent
 SOURCES = ('generic.py', 'generic_inventory.py', 'generic_analysis.py',
+           'generic_flow.py', 'generic_semantics.py', 'generic_geometry.py',
+           'verify_semantics.py', 'tests/generic_arm.py', 'tests/test_generic_flow.py',
            'generic_packing.py', 'generic_plan.py', 'firmware.py', 'runtime_scripts.py',
            'driver_layout.py', 'driver_patch.py', 'package_overlay.py',
            'verify_packing.py', 'verify_generic.py', 'verify_driver.py',
@@ -139,6 +141,7 @@ def draft_plan(report, files, driver=None):
                     'script/start_main_service.sh', 'script/phone_link_deamon.sh')},
                 implementation_sha256={n: sha256((HERE / n).read_bytes()) for n in SOURCES},
                 profile=report['c10_profile'], candidate_hooks=hooks,
+                bounded_semantic_evidence=native.get('semantic_evidence'),
                 required_proofs=capabilities,
                 optional_diagnostics=dict(status='unsupported; logger ABI unproved'),
                 insertion_proposal=proposal,

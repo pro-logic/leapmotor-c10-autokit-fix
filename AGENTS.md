@@ -9,6 +9,8 @@ currently inventories inputs, partially decodes plaintext packed extents and
 reports restricted native candidates/incomplete proof drafts; it cannot emit
 installable images. Read [docs/PACKED_DRIVER_RESEARCH.md](docs/PACKED_DRIVER_RESEARCH.md)
 for the February code-block dependency and decoder-prefix simulation limits.
+Read [docs/SEMANTIC_ANALYSIS.md](docs/SEMANTIC_ANALYSIS.md) for the newer bounded
+CFG/data-flow checks and unmodified-path emulation; these do not grant generation.
 Do not promote a candidate match, insertion proposal, edited draft or matching unpack
 attestation into proof of compatibility. An exact February unpacked driver with
 verified provenance is still missing.

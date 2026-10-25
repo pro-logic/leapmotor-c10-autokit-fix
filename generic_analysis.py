@@ -147,6 +147,7 @@ def open_candidates(driver):
             continue
         results.append(dict(
             hook=driver.site(ins[3]), validation_va=ins[0].address,
+            copy_end_va=last_copy.address + last_copy.size,
             malformed_branch_va=failure, original_open_va=original, effective_open_va=effective,
             format_xref=formats[0], evidence=[
                 'length field at message+4 compared with 28; unequal branch bypasses copy',
@@ -207,11 +208,13 @@ def touch_candidates(driver):
 def analyze_driver(data):
     driver = Driver(data)
     opens, touches = open_candidates(driver), touch_candidates(driver)
+    from generic_semantics import analyze_semantics
     return dict(
         sha256=sha256(data), bytes=len(data), entry=driver.elf['e_entry'], loads=driver.loads,
         candidate_grammar='restricted October-like Thumb data flow; other compiler shapes unsupported',
         open_candidates=opens, touch_candidates=touches,
         unique_candidates=len(opens) == len(touches) == 1,
+        semantic_evidence=analyze_semantics(driver, opens, touches),
         patchable=False,
         blockers=['candidate discovery is not complete semantic proof',
                   'no audited patch plan, insertion layout or parameterized independent emulator yet'],
