@@ -11,10 +11,17 @@ own risk; the MIT licence contains the full warranty and liability disclaimer.
 
 ## The problem
 
-On the tested C10, Android Auto's touch targets were vertically displaced after
-a cold car/head-unit boot. You had to touch above the visible controls. Toggling
-AutoKit's **Show / show navigation bar** setting corrected touch for that
-session, but the offset returned after restarting the car.
+With AutoKit set to **Show Navigation Bar**, the navigation bar appeared after a
+cold car/head-unit boot, but Android Auto used the wrong resolution. The top and
+bottom of the Android Auto image were cropped. This was the original stock issue.
+
+For the tested **HD-mode** setup, the first part of the fix overrides the
+car-requested AA resolution and holds the intended 1920×972 content size, so the
+image fits the area above the navigation bar. That forced-resolution fix
+introduced a touch offset: you had to touch above the visible controls.
+Selecting Show again corrected that alignment for the session. The conditional
+native touch correction compensates for this mismatch introduced by the
+resolution override.
 
 The screen reports 2560×1440, while the bottom navigation layout uses a
 2560×1296 area. The investigation found different startup and post-Show geometry.
@@ -27,6 +34,10 @@ not imply the upstream author wrote, reviewed or endorsed it. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for credits and input provenance.
 
 ## What the patch does
+
+The two functional parts work together: first correct the cropped image by
+overriding the requested resolution, then compensate for the resulting touch
+offset.
 
 - Keeps Android Auto content at 1920×972 and AA-side DPI at 220 using the existing
   session guard (100 ms polling while AA runs).

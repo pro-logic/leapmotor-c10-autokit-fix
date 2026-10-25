@@ -9,16 +9,24 @@ explains the implementation; none of its intermediate installers is required.
 Tested combination: Leapmotor C10, CPC200-CCPA / A15W dongle, dongle firmware
 `2025.10.15.1127`, installed AutoKit `2024.08.06.1042`.
 
-After a cold car/head-unit boot, the picture and touch geometry could disagree:
-touching above an Android Auto icon selected it. Selecting AutoKit's **Show /
-show navigation bar** setting corrected touch, but a later cold boot brought the
-offset back. Whether the original error varied vertically was not measured.
+The original stock failure was **image cropping**, not the later touch offset.
+With AutoKit set to **Show Navigation Bar**, a cold car/head-unit boot showed the
+navigation bar, but Android Auto used an incorrect resolution. The top and
+bottom of its image were cropped.
+
+In the tested **HD-mode** setup, the resolution fix overrides what the car asks
+the dongle to use and holds AA content at 1920×972. This corrected the cropped
+picture, but introduced a touch-coordinate mismatch: touching above an Android
+Auto icon selected it. Selecting Show again corrected touch for that session;
+the offset could return on a later cold boot with the resolution fix in place.
+The conditional native touch adjustment was added as a workaround for that
+introduced mismatch. Do not describe it as the original stock symptom.
 
 Keep these coordinate spaces distinct:
 
 | Space / value | Observed or inferred meaning |
 | --- | --- |
-| Host raw Open `2560×1440` | Bad startup profile; still advertised on a later successful patched boot |
+| Host raw Open `2560×1440` | Cold-boot fullscreen profile; still advertised on a later successful patched boot |
 | Host usable area `2560×1296` | Bottom-navigation layout and the corrected Show profile |
 | AA content `1920×972` | Desired active content, held by the session guard |
 | AA input `1920×1080` | Native input/full-frame tier; distinct from active content |
@@ -27,17 +35,19 @@ Keep these coordinate spaces distinct:
 | SPS `1920×1088` | Observed encoded video allocation; do not equate it to active content |
 
 No single reported height proves that host Views, decoded video, native AA
-input and touch coordinates agree. Compare a bad cold boot and a corrected Show
-session on the **same firmware and process**, including raw Open, effective
-Open, HU info, AA configuration, process hashes and user touch observations.
+input and touch coordinates agree. Record which layer is under test: stock
+cropping, the resolution-only fix's introduced touch error, or the combined fix.
+Compare cold boot and a corrected Show session on the **same firmware and
+process**, including raw Open, effective Open, HU info, AA configuration, process
+hashes and user picture/touch observations.
 
 ## 2. What the earlier approaches established
 
 | Approach | Result and lesson retained in this project |
 | --- | --- |
 | Force smaller AA settings / pre-launch settings only | Host writes after AA exec could overwrite them; a launch-time write alone raced initialization. |
-| Session-scoped `1920×972` guard | Kept the intended picture through delayed initialization. Touch still had an offset, so this is a retained component rather than the complete fix. |
-| AA DPI220 with that guard | Density settings alone did not remove the cold-boot touch error. |
+| Session-scoped `1920×972` guard | Corrected the cropped picture and held the intended resolution through delayed initialization, but introduced the touch offset. The native touch workaround was needed to complete the fix. |
+| AA DPI220 with that guard | Density settings alone did not remove the touch offset introduced by forcing the resolution. |
 | Native Open `1440→1296` only | Corrected stored and downstream native dimensions, but the user still reported wrong touch until Show. Native metadata feedback does not prove a host View was remeasured. |
 | Conditional normalized AA Y shift plus Open correction | Two later cold boots were reported good without Show; a readable later capture confirmed the expected running driver and an ACTIVE correction. The initial post-install session had still needed Show. |
 | Boot-only USB diagnostics | Preserved the same native driver and guard while removing C10 capture workers and output files in quiet mode. A subsequent morning use was reported successful. |

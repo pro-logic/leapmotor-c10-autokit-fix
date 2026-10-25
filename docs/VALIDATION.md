@@ -56,8 +56,14 @@ fixed. No firmware input or output is committed here.
 
 ## Hardware evidence
 
-One development dongle using the v12 native driver had two user-reported good
-cold car boots after Show was used once following installation. A readable later
+The original stock symptom was top/bottom cropping in HD mode after a cold boot
+with Show Navigation Bar enabled, despite the bar being visible. The resolution
+override corrected the picture and introduced a touch offset; the native
+correction was added to compensate for that offset. This sequence was clarified
+by the owner on 25 October 2026.
+
+One development dongle using the combined native correction had two
+user-reported good cold car boots after Show was used once following installation. A readable later
 capture confirmed the expected running driver and active correction. This does
 not explain the initially unsuccessful post-install session.
 

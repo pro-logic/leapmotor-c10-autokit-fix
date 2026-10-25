@@ -7,6 +7,12 @@ Carlinkit / MagicBox **CPC200-CCPA (A15W)** used with a Leapmotor C10. This is
 a resolution/geometry and Android Auto touch fix. Development experiment
 numbers are not product versions or installation prerequisites.
 
+Preserve the causal sequence: with **Show Navigation Bar** enabled, the original
+stock cold-boot fault was cropped AA video (top and bottom). In the tested HD
+setup, overriding the car-requested resolution fixed that picture but introduced
+a touch offset. The native touch adjustment compensates for that introduced
+mismatch. Do not rewrite the history as a stock touch-offset bug.
+
 Read [README.md](README.md), [docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md),
 [docs/VALIDATION.md](docs/VALIDATION.md) and [THIRD_PARTY.md](THIRD_PARTY.md)
 before changing behavior or porting to another firmware. The research guide
