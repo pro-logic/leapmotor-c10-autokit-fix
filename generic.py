@@ -9,7 +9,7 @@ from firmware import sha256
 from generic_analysis import analyze_driver
 from generic_inventory import MAX_IMAGE, inventory
 from generic_packing import inspect_packed
-from generic_plan import draft_plan
+from generic_plan import HERE, SOURCES, draft_plan
 from generic_unpack import unpack_driver
 from runtime_scripts import STOCK_SHA, PACKED_SHA, START, DAEMON
 from driver_layout import SOURCE_SHA
@@ -63,6 +63,7 @@ def analyze(image, driver=None, receipt=None, kernel=None):
         driver = decoded
     report = dict(
         schema='c10-generic-analysis-v1', experimental=True, mode='analysis-only',
+        source_sha256={name: sha256((HERE / name).read_bytes()) for name in SOURCES},
         inventory=stock, c10_profile=C10_PROFILE, patchable=False, hardware_tested=False,
         packed_driver=dict(bytes=len(packed), sha256=sha256(packed),
                            upx_marker_present=b'UPX!' in packed,
@@ -81,6 +82,12 @@ def analyze(image, driver=None, receipt=None, kernel=None):
     except ValueError as error:
         report['packed_driver']['structure'] = dict(status='unsupported', reason=str(error),
                                                     complete_native_input=False, patchable=False)
+    from generic_runtime import derive_runtime
+    try:
+        _, runtime_evidence = derive_runtime(files)
+        report['startup_analysis']['stock_derived_control_flow'] = runtime_evidence
+    except ValueError as error:
+        report['startup_analysis']['stock_derived_control_flow'] = dict(status='unsupported',reason=str(error))
     if driver is None:
         if receipt is not None:
             raise ValueError('--provenance requires --driver')

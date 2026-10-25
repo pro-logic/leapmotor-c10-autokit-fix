@@ -1,7 +1,8 @@
 """ELF-derived ARM test machine for unmodified discovered semantic slices.
 
-Only malloc/free/realloc and explicitly supplied I/O targets are mocked. Actual
-packet object code executes. This is neither OS emulation nor hardware evidence.
+Allocation, explicit I/O targets and explicitly supplied import contracts can be
+mocked. Actual packet object code executes; unknown imports always fail. This
+is neither OS emulation nor hardware evidence.
 No generation code, October layout constants, or stock hashes are imported here.
 """
 import io
@@ -123,8 +124,9 @@ class Machine:
                 return
             if address in imports:
                 symbol = imports[address]
+                returned_state = None
                 if import_handlers and symbol in import_handlers:
-                    import_handlers[symbol](self)
+                    returned_state = import_handlers[symbol](self)
                 elif symbol == 'malloc':
                     self.reg(UC_ARM_REG_R0, self.allocate(self.reg(UC_ARM_REG_R0)))
                 elif symbol == 'free':
@@ -146,6 +148,9 @@ class Machine:
                 self.events.append(dict(target=address, mock='explicit import contract' if import_handlers and symbol in import_handlers
                                         else 'host allocator', symbol=symbol))
                 caller_clobbers()
+                if returned_state is not None:
+                    for register, value in returned_state.items():
+                        self.reg(register,value)
                 self.reg(UC_ARM_REG_PC, self.reg(UC_ARM_REG_LR))
 
         hook = self.uc.hook_add(UC_HOOK_CODE, execute)

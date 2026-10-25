@@ -1,6 +1,17 @@
 # Experimental generic A15W patcher
 
-Local checkpoint: 25 October 2026, Australia/Sydney.
+Local checkpoint: 26 October 2026, Australia/Sydney.
+
+The current continuation is documented in
+[CHANNEL_ENTRY_CONTRACTS.md](CHANNEL_ENTRY_CONTRACTS.md) and
+[ADMISSION.md](ADMISSION.md). It integrates bounded native channel/storage
+relationships, actual-span hook/unwind/entry audits, stock-derived runtime and
+paired installer components. Source identities now cover all 59 files in the
+implementation/test tree. The plaintext-safe three-hook experiment corrects
+explicit plaintext Open or encrypted Open after the actual CFB return; it never
+uses inactive crypto state as plaintext proof. Production audited generation
+and installable generic pairs remain unavailable. The earlier checkpoints below
+describe their historical scope and test counts.
 
 Latest continuation: [MESSAGE_CRYPTO.md](MESSAGE_CRYPTO.md) checks both layouts'
 conditional Open CFB behavior and key/IV construction. Encrypted Open with

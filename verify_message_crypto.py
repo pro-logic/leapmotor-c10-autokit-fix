@@ -56,18 +56,30 @@ def expected_material(driver, table, seed):
     return bytes(key), bytes(iv)
 
 
-def case(data, oracle, seed, active, marker, length, dispatch=False):
-    m = arm.Machine(data)
+def case(data, oracle, seed, active, marker, length, dispatch=False,
+         machine_data=None, patch_state=None, fields=(2560, 1440, 30, 5, 0x4000, 11, 5), kind=1):
+    m = arm.Machine(data if machine_data is None else machine_data)
     key, iv = expected_material(m.driver, oracle['table'], seed)
-    plain = struct.pack('<7I', 2560, 1440, 30, 5, 0x4000, 11, 5) + bytes(range(36))
+    plain = struct.pack('<7I', *fields) + bytes(range(36))
     enc = Cipher(algorithms.AES(key), modes.CFB(iv)).encryptor()
     cipher = enc.update(plain) + enc.finalize()
     supplied = cipher if marker == MARKER else plain
     expected = plain[:length] + supplied[length:] if marker == MARKER and active > 0 and length else supplied
-    descriptor = struct.pack('<8I', marker, length, 1, 0x11223344, m.payload, 0x22334455, 0x33445566, 0x44556677)
+    descriptor = struct.pack('<8I', marker, length, kind, 0x11223344, m.payload, 0x22334455, 0x33445566, 0x44556677)
     m.write(m.message, descriptor)
     m.write(m.payload - 16, b'\xa5' * 16 + supplied + b'\x5a' * 16)
     m.word(oracle['active'], active)
+    admitted = patch_state is not None and kind == 1 and length == 28 and (
+        marker == MARKER and active > 0 or dispatch and marker == 0x55aa55aa)
+    matching = admitted and fields[:2] == (2560,1440)
+    if matching:
+        body = bytearray(expected)
+        struct.pack_into('<I', body, 4, 1296)
+        expected = bytes(body)
+    if patch_state is not None:
+        m.word(patch_state[0],patch_state[1])
+        m.word(patch_state[0]+4,0x12345678)
+        m.word(patch_state[0]+8,0x23456789)
     saved_values = {reg: 0x12340000 + index * 0x101 for index, reg in enumerate(SAVED)}
     for reg, value in saved_values.items():
         m.reg(reg, value)
@@ -82,6 +94,11 @@ def case(data, oracle, seed, active, marker, length, dispatch=False):
         m.reg(arm.UC_ARM_REG_R1, m.message)
         m.reg(arm.UC_ARM_REG_R2, seed & 0xffffffff)
     initial_rw = m.rw_snapshot()
+    expected_rw = [bytearray(body) for body in initial_rw]
+    if admitted:
+        for index,(va,size) in enumerate(m.writable):
+            if va <= patch_state[0] and patch_state[0]+12 <= va+size:
+                struct.pack_into('<3I',expected_rw[index],patch_state[0]-va,int(matching),*fields[:2])
     counts = Counter()
     schedule = None
     helper_sp = m.stack - 28 - 0x12c
@@ -126,7 +143,7 @@ def case(data, oracle, seed, active, marker, length, dispatch=False):
         # Run the actual three argument-setup instructions, helper, return and
         # native type/length dispatch. Stop at the hook or malformed Open target.
         start = oracle['call'] - 6
-        stops = (oracle['hook'],)
+        stops = (oracle['hook'] + (4 if patch_state is not None else 0),)
     else:
         start, stops = oracle['helper'], (m.stop,)
     m.run(start, stops, (oracle['logger'],), limit=5000,
@@ -140,7 +157,7 @@ def case(data, oracle, seed, active, marker, length, dispatch=False):
     require(m.read(m.payload - 16, 96) == b'\xa5' * 16 + expected + b'\x5a' * 16,
             'Native preprocessing changed unexpected payload bytes or failed decryption')
     require(m.read(m.message, 32) == descriptor, 'Native preprocessing mutated descriptor')
-    require(m.rw_snapshot() == initial_rw, 'Native preprocessing mutated original writable mapping')
+    require(m.rw_snapshot() == [bytes(body) for body in expected_rw], 'Native preprocessing mutated unexpected writable bytes')
     require(m.reg(arm.UC_ARM_REG_SP) == m.stack, 'Native preprocessing failed stack balance')
     require(all(m.reg(r) == v for r, v in saved_values.items()), 'Native preprocessing clobbered callee-saved register')
     return dict(decrypt=decrypt, diagnostic_bypass=log, encrypted_inactive_reached_hook=dispatch and log,

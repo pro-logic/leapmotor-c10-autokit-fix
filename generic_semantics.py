@@ -270,4 +270,10 @@ def analyze_semantics(driver, opens, touches):
             result['touch'].append(dict(unsupported=str(error)))
     from generic_geometry import geometry_consumers
     result['geometry_consumers'] = geometry_consumers(context, result['geometry_pointer_xrefs'])
+    if len(result['open']) == 1:
+        opened = result['open'][0]
+        pre = opened.get('preprocessing', [])
+        if len(pre) == 1 and pre[0]['open_cfb_contract']['status'] != 'unsupported':
+            from generic_admission import analyze_admission
+            result['admission'] = analyze_admission(driver,opened['graph']['entry'],pre[0]['open_cfb_contract'])
     return result

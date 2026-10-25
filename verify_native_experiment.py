@@ -19,6 +19,8 @@ from generic_plan import SOURCES, HERE
 from tests.generic_arm import Machine, touch_dispatch
 from tests.native_experiment import experiment
 from verify_semantics import ORACLES, annotations, require
+from generic_abi import verify_unwind_tail_extension
+from generic_analysis import Driver
 
 INTEGER = [getattr(regs, f'UC_ARM_REG_R{i}') for i in range(13)] + [regs.UC_ARM_REG_SP, regs.UC_ARM_REG_LR, regs.UC_ARM_REG_CPSR]
 VFP = [getattr(regs, f'UC_ARM_REG_D{i}') for i in range(32)]
@@ -30,6 +32,9 @@ def elf_check(original, changed, manifest):
     rx, rw = sorted(loads, key=lambda p: p['p_vaddr'])
     cut = rx['p_offset'] + rx['p_filesz']
     gap = len(changed) - len(original)
+    unwind = manifest.get('cfb_observer_unwind')
+    if unwind:
+        verify_unwind_tail_extension(Driver(original),Driver(changed),unwind)
     require(cut == manifest['layout']['insertion_file_offset'] and gap > 0, 'Independent insertion boundary differs')
     require(old.num_segments() == new.num_segments() and old.num_sections() == new.num_sections(), 'ELF table count drift')
     for key, value in old.header.items():
@@ -44,6 +49,8 @@ def elf_check(original, changed, manifest):
                 expected += manifest['code_bytes']
             if a['p_type'] == 'PT_LOAD' and a['p_flags'] == 6 and key == 'p_memsz':
                 expected += manifest['layout']['rw_memsz_extension']
+            if unwind and a['p_type'] == 'PT_ARM_EXIDX' and key in ('p_filesz','p_memsz'):
+                expected = unwind['new_index_bytes']
             require(b[key] == expected, f'ELF program field changed unexpectedly: {key}')
         if a['p_type'] == 'PT_LOAD' and a['p_flags'] == 6:
             require(a.data() == b.data(), 'Original writable file bytes changed')
@@ -52,6 +59,10 @@ def elf_check(original, changed, manifest):
     for a, b in zip(old.iter_sections(), new.iter_sections()):
         for key, value in a.header.items():
             expected = value + gap if key == 'sh_offset' and value >= cut else value
+            if unwind and a.name == '.ARM.exidx' and key == 'sh_size':
+                expected = unwind['new_index_bytes']
+            if unwind and a.name == '.eh_frame' and key == 'sh_size':
+                expected = unwind['empty_eh_frame_section']['replacement_size']
             require(b[key] == expected, f'Section metadata drift: {a.name}/{key}')
         if a['sh_type'] != 'SHT_NOBITS':
             expected = bytearray(a.data())
@@ -59,6 +70,12 @@ def elf_check(original, changed, manifest):
                 for hook in manifest['hooks']:
                     off = hook['va'] - a['sh_addr']
                     expected[off:off + 4] = bytes.fromhex(hook['replacement'])
+            if unwind and a.name == '.ARM.exidx':
+                expected += bytes.fromhex(unwind['appended_bytes'])
+            if unwind and a.name == '.eh_frame':
+                require(a.data()==bytes(4),'Expected empty DWARF terminator')
+                require(Driver(changed).read(a['sh_addr'],4)==a.data(),'Original empty DWARF terminator changed')
+                expected=bytearray()
             require(b.data() == expected, f'Original section bytes changed: {a.name}')
     require(manifest['state_va'] >= rw['p_vaddr'] + rw['p_memsz'], 'State overlaps original writable memory')
     return 'PASS: all program/section metadata, original mappings/RW/dynamic/GOT/unwind bytes and declared hook edits'
@@ -74,9 +91,11 @@ def seed_machine(machine, seed):
                 | ((seed & 31) << 27) | ((seed & 15) << 16))
     for reg in VFP:
         machine.reg(reg, rng.getrandbits(64))
+    machine.reg(regs.UC_ARM_REG_FPSCR,((seed & 31) << 27) | ((seed & 3) << 22) | (seed & 31))
+    machine.reg(regs.UC_ARM_REG_FPEXC,0x40000000)
 
 
-def direct_open(original, changed, op, state):
+def direct_open(original, changed, op, state, plain_marker=None):
     count = 0
     for seed in range(32):
         for width, height, length, kind in ((2560,1440,28,1), (2560,1296,28,1), (1920,1080,28,1),
@@ -84,6 +103,8 @@ def direct_open(original, changed, op, state):
             old, new = Machine(original), Machine(changed)
             for m in (old, new):
                 seed_machine(m, seed)
+                if plain_marker is not None:
+                    m.word(m.message, plain_marker)
                 m.word(m.message + 4, length)
                 m.word(m.message + 8, kind)
                 m.word(m.message + 16, m.payload)
@@ -96,6 +117,8 @@ def direct_open(original, changed, op, state):
             new.run(op['hook']['va'], (op['hook']['return_va'],))
             require([old.reg(r) for r in INTEGER] == [new.reg(r) for r in INTEGER], 'Open hook integer/flags/GE/SP/LR drift')
             require([old.reg(r) for r in VFP] == [new.reg(r) for r in VFP], 'Open hook VFP drift')
+            for r in (regs.UC_ARM_REG_FPSCR,regs.UC_ARM_REG_FPEXC):
+                require(old.reg(r)==new.reg(r),'Open hook VFP control drift')
             matching = length == 28 and kind == 1 and (width,height) == (2560,1440)
             expected_flag = int(matching) if length == 28 and kind == 1 else seed & 1
             require(new.word(state) == expected_flag, 'Open gate/raw profile state differs')
@@ -133,6 +156,8 @@ def direct_touch(original, changed, touch, state, stack_offset):
                     require(old.reg(VFP[7]) >> 32 == new.reg(VFP[7]) >> 32,'Touch hook changed S15/X bits')
                     require(new.reg(VFP[7]) & 0xffffffff == expected & 0xffffffff,'Touch hook signed Y correction differs')
                     require(new.read(new.payload,12) == old.read(old.payload,12),'Touch hook changed source payload')
+                    for r in (regs.UC_ARM_REG_FPSCR,regs.UC_ARM_REG_FPEXC):
+                        require(old.reg(r)==new.reg(r),'Touch hook VFP control drift')
                     require(new.rw_snapshot() == rw,'Touch hook changed writable state')
                     after = bytearray(new.read(new.stack - 256,512))
                     after[236:256] = stack[236:256]
@@ -141,15 +166,16 @@ def direct_touch(original, changed, touch, state, stack_offset):
     return count
 
 
-def verify(path, fixture):
+def verify(path, fixture, plaintext_safe=False):
     original = Path(path).read_bytes()
     oracle = ORACLES[fixture]
     require(sha256(original) == oracle['sha'],'Independent experiment fixture differs')
     native = analyze_driver(original)
     op,touch,sem,roles = annotations(native,oracle)
-    changed,manifest = experiment(original,native)
+    changed,manifest = experiment(original,native,plaintext_safe=plaintext_safe)
     checked = elf_check(original,changed,manifest)
-    opened = direct_open(original,changed,op,manifest['state_va'])
+    plain_marker = manifest['plain_packet_marker']['marker'] if plaintext_safe else None
+    opened = direct_open(original,changed,op,manifest['state_va'],plain_marker)
     touched = direct_touch(original,changed,touch,manifest['state_va'],sem['touch'][0]['routing']['channel_stack_offset'])
     full = 0
     for active in (0,1):
@@ -177,6 +203,8 @@ def verify(path, fixture):
             (2560,1296,28,.6), (2560,1440,27,.6), (2560,1440,28,.55),
             (2560,1296,27,.55), (1920,1440,28,.6)):
         m.word(m.message+4,length)
+        if plain_marker is not None:
+            m.word(m.message,plain_marker)
         m.word(m.message+8,1)
         m.word(m.message+16,m.payload)
         m.write(m.payload,struct.pack('<7I',width,height,30,5,0x4000,11,5))
@@ -193,6 +221,7 @@ def verify(path, fixture):
                 direct_open_cases=opened,direct_touch_cases=touched,full_dispatch_cases=full,
                 open_show_state_sequences=sequences,
                 all_nzcvq_and_ge_patterns=True,all_integer_and_32_vfp_registers_checked=True,
+                fpscr_fpexc_checked=True,
                 evidence_level='in-memory generated hook/ELF experiment and Unicorn; no experimental ELF exported',
                 generation_allowed=False,installable_images_emitted=False,hardware_tested=False,
                 remaining=['outside-entry/crypto-condition/interprocedural proof and audited plan acceptance',

@@ -229,7 +229,7 @@ def analyze_driver(data):
     driver = Driver(data)
     opens, touches = open_candidates(driver), touch_candidates(driver)
     from generic_semantics import analyze_semantics
-    return dict(
+    result = dict(
         sha256=sha256(data), bytes=len(data), entry=driver.elf['e_entry'], loads=driver.loads,
         candidate_grammar='restricted Thumb data flow with checked register allocation/scheduling roles; other shapes unsupported',
         open_candidates=opens, touch_candidates=touches,
@@ -239,3 +239,6 @@ def analyze_driver(data):
         blockers=['candidate discovery is not complete semantic proof',
                   'no audited patch plan, insertion layout or parameterized independent emulator yet'],
     )
+    from generic_channel import analyze_channel
+    result['channel_storage_evidence'] = analyze_channel(driver, result)
+    return result

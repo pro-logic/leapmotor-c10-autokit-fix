@@ -13,20 +13,13 @@ from firmware import sha256
 from generic_analysis import Driver
 
 HERE = Path(__file__).resolve().parent
-SOURCES = ('generic.py', 'generic_inventory.py', 'generic_analysis.py',
-           'generic_flow.py', 'generic_semantics.py', 'generic_geometry.py', 'generic_crypto.py',
-           'verify_semantics.py', 'verify_message_crypto.py', 'tests/generic_arm.py',
-           'tests/test_generic_flow.py', 'tests/test_generic_crypto.py',
-           'generic_packing.py', 'generic_plan.py', 'firmware.py', 'runtime_scripts.py',
-           'generic_unpack.py',
-           'verify_host_unpack.py', 'tests/test_generic_unpack.py',
-           'verify_native_experiment.py', 'tests/native_experiment.py',
-           'driver_layout.py', 'driver_patch.py', 'package_overlay.py',
-           'verify_packing.py', 'verify_generic.py', 'verify_driver.py',
-           'tests/arm_harness.py', 'tests/test_generic.py', 'tests/test_generic_proof.py',
-           'templates/once.sh.in', 'templates/finish.sh.in',
-           'runtime/c10_start_androidauto_972.sh', 'runtime/c10_capture_init.sh',
-           'runtime/c10_usb_capture.sh')
+# Bind the complete implementation/test tree. A newly added verifier or test
+# invalidates old drafts too. Ignored inputs/output/dependency trees are never
+# traversed. Documents are recorded separately by run summaries.
+SOURCES = tuple(sorted({p.relative_to(HERE).as_posix()
+                        for pattern in ('*.py', 'tests/*.py', 'tools/*.py',
+                                        'runtime/*.sh', 'templates/*.in', 'requirements.txt')
+                        for p in HERE.glob(pattern) if p.is_file()}))
 REQUIRED_PROOFS = (
     'exact-packed-to-unpacked-pairing', 'plaintext-open-after-decryption',
     'open-length-and-all-incoming-edges', 'open-register-flags-stack-vfp-liveness',
@@ -146,6 +139,11 @@ def draft_plan(report, files, driver=None):
                 capabilities['plaintext-open-after-decryption']['evidence'].append(dict(
                     kind='bounded conditional message-CFB contract; no unconditional plaintext proof',
                     contract=contract))
+    channel = native.get('channel_storage_evidence')
+    if channel:
+        capabilities['touch-aa-channel-and-stack-origin']['evidence'].append(dict(
+            kind='bounded native channel/storage relationships; all-caller ownership remains unproved',
+            contract=channel))
     return dict(schema='c10-proof-draft-v1', status='incomplete; generation refused',
                 patchable=False, generation_allowed=False, hardware_tested=False,
                 image_sha256=report['inventory']['image_sha256'],

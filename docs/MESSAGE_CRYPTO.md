@@ -1,5 +1,13 @@
 # Open message decryption contract
 
+Continuation, 26 October 2026: the native in-memory experiment now offers a
+plaintext-safe three-hook design, described in
+[CHANNEL_ENTRY_CONTRACTS.md](CHANNEL_ENTRY_CONTRACTS.md). It corrects an explicit
+plaintext marker in the ordinary Open hook and observes the actual CFB call's
+return for encrypted Open. This avoids assuming decryption from a later crypto
+state read. It does not change the conditional stock contract below or grant
+production generation authority.
+
 25 October 2026. Both exact February and October drivers now have a checked,
 entry-relative contract for their Open message-CFB preprocessing. This is
 separate from the completed packed-file CBC decoder in [HOST_DECODING.md](HOST_DECODING.md).

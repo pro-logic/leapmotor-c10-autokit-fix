@@ -103,6 +103,24 @@ def caller_seed_source(graph, call):
                 assumptions=['intervening callees preserve r4', 'runtime writers/concurrency not proved'])
 
 
+def plain_packet_marker(driver, initializer):
+    """Derive the native packet initializer's explicit unencrypted marker.
+
+    This is a restricted initializer contract, not transport admission proof.
+    """
+    graph = ThumbGraph(driver, initializer, initializer + 28)
+    _need(not graph.issues, 'Unsupported packet initializer graph')
+    specs = [('ldr', None), ('str', 'r2, [r0]'), ('movs', 'r2, #0')]
+    specs += [('str', f'r2, [r0, #{offset:#x}]' if offset >= 10 else f'r2, [r0, #{offset}]')
+              for offset in range(4, 32, 4)]
+    specs += [('mov.w', 'r2, #-1'), ('str', 'r2, [r0, #0x20]'), ('bx', 'lr')]
+    items = _sequence(graph, initializer, specs)
+    _need(set(graph.nodes) == {i.address for i in items}, 'Unexpected initializer paths')
+    return dict(status='checked explicit packet initializer marker', initializer_va=initializer,
+                marker=_literal(driver, items[0], 'r2'),
+                scope='descriptor offset zero; remaining fields initialized independently')
+
+
 def open_cfb_contract(context, helper, call):
     """Recognize *all entry paths* specialized to direction=0 and type=1.
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from driver_layout import assemble
 from generic_analysis import Driver
-from generic_crypto import caller_seed_source, open_cfb_contract
+from generic_crypto import caller_seed_source, open_cfb_contract, plain_packet_marker
 from generic_flow import ThumbGraph
 from tests.test_generic import native_fixture
 
@@ -144,6 +144,32 @@ marker: .word 0x12345678
 
 
 class MessageCryptoTests(unittest.TestCase):
+    def test_plain_marker_comes_from_relocated_packet_initializer(self):
+        for base in (0x10000,0x430000):
+            source='''ldr r2,marker
+str r2,[r0]
+movs r2,#0
+str r2,[r0,#4]
+str r2,[r0,#8]
+str r2,[r0,#0xc]
+str r2,[r0,#0x10]
+str r2,[r0,#0x14]
+str r2,[r0,#0x18]
+str r2,[r0,#0x1c]
+mov.w r2,#-1
+str r2,[r0,#0x20]
+bx lr
+.align 2
+marker: .word 0x13572468
+'''
+            data=bytearray(native_fixture(base))
+            code=assemble(source,base+0x600)
+            data[0x600:0x600+len(code)]=code
+            self.assertEqual(plain_packet_marker(Driver(bytes(data)),base+0x600)['marker'],0x13572468)
+            changed=assemble(source.replace('str r2,[r0,#0x14]','str r2,[r1,#0x14]'),base+0x600)
+            data[0x600:0x600+len(changed)]=changed
+            with self.assertRaises(ValueError):plain_packet_marker(Driver(bytes(data)),base+0x600)
+
     def test_caller_seed_pointer_is_derived_and_clobbers_refused(self):
         for base in (0x10000, 0x430000):
             for clobber in (False, True):

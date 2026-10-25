@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from generic import analyze
 from generic_packing import MAGIC, decode_lzma, inspect_packed
-from generic_plan import draft_plan, insertion_layout, validate_draft
+from generic_plan import HERE, SOURCES, draft_plan, insertion_layout, validate_draft
 from tests.test_generic import archive, native_fixture
 
 
@@ -72,6 +72,15 @@ class PackingTests(unittest.TestCase):
 
 
 class ProofDraftTests(unittest.TestCase):
+    def test_source_identity_covers_implementation_verifiers_and_harnesses(self):
+        required = {p.relative_to(HERE).as_posix() for pattern in ('*.py', 'tests/*.py', 'tools/*.py',
+                    'runtime/*.sh', 'templates/*.in', 'requirements.txt') for p in HERE.glob(pattern)}
+        self.assertEqual(set(SOURCES), required)
+        self.assertEqual(len(SOURCES), len(set(SOURCES)))
+        self.assertTrue({'generic_channel.py', 'generic_global_flow.py', 'generic_package.py',
+                         'verify_generic_contracts.py', 'tests/shell_runtime.py'} <= required)
+        self.assertFalse(any(name.startswith(('inputs/', 'dist/', '.venv/')) for name in SOURCES))
+
     def test_relocated_layouts_derive_offsets_state_and_alignment(self):
         for base in (0x10000, 0x430000):
             with self.subTest(base=base):
