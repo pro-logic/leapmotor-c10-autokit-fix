@@ -95,6 +95,11 @@ hardware-encrypted variant. If you do not already have the exact file, follow
 shell access to a matching stock dongle and a separately obtained hardware UPX
 tool. This repo does not install SSH or automatically flash a collector.
 
+Other versions and source links are recorded in
+[docs/FIRMWARE_CATALOG.md](docs/FIRMWARE_CATALOG.md), with verified images
+separated from documented versions and user reports. A catalogue entry does
+not extend the patcher's compatibility.
+
 ## Build
 
 Use Python **3.10 or newer** on Windows or Linux. The local reference build used
