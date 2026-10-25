@@ -10,6 +10,7 @@ from generic_analysis import analyze_driver
 from generic_inventory import MAX_IMAGE, inventory
 from generic_packing import inspect_packed
 from generic_plan import draft_plan
+from generic_unpack import unpack_driver
 from runtime_scripts import STOCK_SHA, PACKED_SHA, START, DAEMON
 from driver_layout import SOURCE_SHA
 
@@ -51,15 +52,22 @@ def pairing(stock, packed, driver, receipt=None):
     return result
 
 
-def analyze(image, driver=None, receipt=None):
+def analyze(image, driver=None, receipt=None, kernel=None):
     stock, files = inventory(image)
     packed = files['usr/sbin/ARMadb-driver']
+    unpack_evidence = None
+    if kernel is not None:
+        decoded, unpack_evidence = unpack_driver(packed, kernel)
+        if driver is not None and driver != decoded:
+            raise ValueError('Supplied native driver differs from reproduced packed input decoding')
+        driver = decoded
     report = dict(
         schema='c10-generic-analysis-v1', experimental=True, mode='analysis-only',
         inventory=stock, c10_profile=C10_PROFILE, patchable=False, hardware_tested=False,
         packed_driver=dict(bytes=len(packed), sha256=sha256(packed),
                            upx_marker_present=b'UPX!' in packed,
-                           decoding='complete native decoding not performed; see bounded structure inspection'),
+                           decoding='reproduced host decode; see pairing evidence' if unpack_evidence else
+                                    'complete native decoding not performed; see bounded structure inspection'),
         startup_analysis=dict(
             start_custom_init_anchor_count=files[START[2:]].count(b'#run custom init shell\n'),
             start_logging_anchor_count=files[START[2:]].count(b'\tif [ -e /etc/log_com ]; then'),
@@ -79,7 +87,10 @@ def analyze(image, driver=None, receipt=None):
         report['blockers'].append('exact unpacked driver and verified packed-to-unpacked provenance required')
     else:
         report['pairing'] = pairing(stock, packed, driver, receipt)
-        if report['pairing']['status'] != 'documented-reference':
+        if unpack_evidence is not None:
+            report['pairing'].update(status='reproduced-host-decode', method=unpack_evidence['method'],
+                                     decoding_evidence=unpack_evidence)
+        if report['pairing']['status'] not in ('documented-reference', 'reproduced-host-decode'):
             report['blockers'].append('packed-to-unpacked pairing has not been independently verified')
         try:
             report['native'] = analyze_driver(driver)
@@ -95,19 +106,36 @@ def analyze(image, driver=None, receipt=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('analyze', 'extract-driver', 'draft-plan'))
+    parser.add_argument('command', choices=('analyze', 'extract-driver', 'unpack-driver', 'draft-plan'))
     parser.add_argument('--stock', required=True, type=Path)
     parser.add_argument('--driver', type=Path, help='Candidate exact unpacked ELF; never substitutes another input')
     parser.add_argument('--provenance', type=Path, help='Optional unpack attestation; hash binding is not verification')
+    parser.add_argument('--kernel', type=Path, help='Audited local kernel snapshot for reproducible host decoding')
     parser.add_argument('--output', type=Path, help='New report/draft file, or NEW directory for extract-driver')
     args = parser.parse_args()
     try:
-        if args.command == 'extract-driver' and (args.driver or args.provenance):
+        if args.command == 'extract-driver' and (args.driver or args.provenance or args.kernel):
             raise ValueError('extract-driver accepts only --stock and --output')
         image = read_bounded(args.stock, MAX_IMAGE)
+        kernel = read_bounded(args.kernel, 8 * 1024 * 1024) if args.kernel else None
+        if args.command == 'unpack-driver':
+            if kernel is None or args.driver or args.provenance:
+                raise ValueError('unpack-driver requires --kernel; does not accept --driver/--provenance')
+            stock, files = inventory(image)
+            decoded, proof = unpack_driver(files['usr/sbin/ARMadb-driver'], kernel)
+            output = args.output or Path('dist/generic') / f'{stock["version"]}-{stock["image_sha256"][:12]}' / 'host-unpack'
+            output.mkdir(parents=True, exist_ok=False)
+            (output / 'ARMadb-driver.unpacked').write_bytes(decoded)
+            proof.update(image_sha256=stock['image_sha256'], product=stock['product'], version=stock['version'])
+            (output / 'decoding-evidence.json').write_text(json.dumps(proof, indent=2) + '\n', encoding='utf-8')
+            print(json.dumps(dict(output=str(output.resolve()), unpacked_sha256=sha256(decoded),
+                                  decoding_reproduced=True, patchable=False), indent=2))
+            return
         driver = read_bounded(args.driver, 16 * 1024 * 1024) if args.driver else None
+        if kernel is not None and driver is None:
+            driver = unpack_driver(inventory(image)[1]['usr/sbin/ARMadb-driver'], kernel)[0]
         receipt = json.loads(read_bounded(args.provenance, 65536)) if args.provenance else None
-        report, files = analyze(image, driver, receipt)
+        report, files = analyze(image, driver, receipt, kernel)
         stock = report['inventory']
         base = Path('dist/generic') / f'{stock["version"]}-{stock["image_sha256"][:12]}'
         if args.command == 'extract-driver':

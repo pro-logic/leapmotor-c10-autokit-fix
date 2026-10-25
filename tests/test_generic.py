@@ -32,12 +32,14 @@ def archive(extra=(), overrides=None, archive_format=tarfile.USTAR_FORMAT):
     return crypt(buffer.getvalue(), False)
 
 
-def native_fixture(base=0x10000, duplicate=False, divisor=10000.0, invalid_length=False):
+def native_fixture(base=0x10000, duplicate=False, divisor=10000.0, invalid_length=False,
+                   size_reg='r2', type_reg='lr', action_reg='sl', scheduled_load=False):
     """Small source-generated ELF; addresses/section offsets differ from vendor ELF."""
     data = bytearray(0x1800)
     rw = base + 0x3000
     open_start, touch_start = base + 0x100, base + 0x300
     original, effective = rw + 0x20, rw + 0x60
+    header_registers = ','.join(sorted((size_reg,type_reg),key=lambda r: 14 if r == 'lr' else int(r[1:])))
     source = f'''
 ldr r3, [r6, #4]
 cmp r3, #{27 if invalid_length else 28}
@@ -74,17 +76,20 @@ format_ptr: .word {base + 0x900}
 '''
     code = assemble(source, open_start)
     data[0x100:0x100 + len(code)] = code
-    touch = assemble(f'''
+    prefix = f'''
 vldr s15,[r4,#4]
-movs r2,#24
+movs {size_reg},#24
 ldr r3,[sp,#0x70]
-mov.w lr,#11
-orr.w r5,sl,r5,lsl #8
+{'mov.w' if type_reg == 'lr' else 'movs'} {type_reg},#11
+orr.w r5,{action_reg},r5,lsl #8
 vldr s14,[r4,#8]
-stm.w r3,{{r2,lr}}
+stm.w r3,{{{header_registers}}}
 str r5,[r3,#0x18]
 vcvt.f64.s32 d6,s15
-vldr d5,[pc,#{base + 0x500 - ((touch_start + 30 + 4) & ~3)}]
+''' + ('ldr.w r0,[sb]\n' if scheduled_load else '')
+    divisor_load = touch_start + len(assemble(prefix, touch_start))
+    touch = assemble(prefix + f'''
+vldr d5,[pc,#{base + 0x500 - ((divisor_load + 4) & ~3)}]
 vcvt.f64.s32 d7,s14
 vdiv.f64 d6,d6,d5
 vdiv.f64 d7,d7,d5
@@ -162,6 +167,17 @@ class InventoryTests(unittest.TestCase):
 
 
 class NativeTests(unittest.TestCase):
+    def test_register_allocation_and_integer_scheduling_are_semantic_roles(self):
+        for base in (0x10000, 0x430000):
+            r = analyze_driver(native_fixture(base, size_reg='r0', type_reg='r2', action_reg='r7', scheduled_load=True))
+            self.assertTrue(r['unique_candidates'])
+            touch = r['touch_candidates'][0]
+            self.assertEqual((touch['size_register'], touch['type_register'], touch['action_register']), ('r0','r2','r7'))
+            self.assertEqual(touch['divisor_va'], base + 0x500)
+            self.assertIsNotNone(touch['scheduled_integer_load_va'])
+        for kwargs in (dict(size_reg='r2', type_reg='r0'), dict(size_reg='r3', type_reg='lr')):
+            self.assertFalse(analyze_driver(native_fixture(**kwargs))['touch_candidates'])
+
     def test_relocated_sources_discover_roles_without_original_addresses(self):
         for base in (0x10000, 0x430000):
             with self.subTest(base=base):

@@ -18,14 +18,23 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def verify(october_stock, february_stock, october_driver, reference):
+def verify(october_stock, february_stock, october_driver, reference, february_driver=None, kernel=None):
     october = read_bounded(october_stock, 64 * 1024 * 1024)
     february = read_bounded(february_stock, 64 * 1024 * 1024)
     driver = read_bounded(october_driver, 16 * 1024 * 1024)
     require(sha256(october) == '24589f1b71b95d87379ee2a10e130e939cd45c28bcd3ec328499f5bbd2bc477e', 'October fixture differs')
     require(sha256(february) == '5c00b2e47aca6efc15625a1887ed857b1dceac691ff9dde96ac7de2f00adf8f8', 'February fixture differs')
     require(sha256(driver) == '0fc23de27693c03455f42b9904df89cff7fc8dccb990f3edfa27c40aea41faee', 'October unpacked fixture differs')
-    reports = [analyze(october, driver)[0], analyze(february)[0]]
+    kernel_data = read_bounded(kernel, 8 * 1024 * 1024) if kernel else None
+    february_native = read_bounded(february_driver, 16 * 1024 * 1024) if february_driver else None
+    if february_native is not None and kernel_data is None:
+        raise ValueError('February verification requires reproduced host decoding with --kernel')
+    reports = [analyze(october, driver, kernel=kernel_data)[0],
+               analyze(february, february_native, kernel=kernel_data)[0] if february_native is not None else analyze(february)[0]]
+    if february_native is not None:
+        from verify_semantics import annotations, ORACLES
+        annotations(reports[0]['native'], ORACLES['october'])
+        annotations(reports[1]['native'], ORACLES['february'])
     native = reports[0]['native']
     require(native['unique_candidates'], 'October needs unique candidates')
     op, touch = native['open_candidates'][0], native['touch_candidates'][0]
@@ -40,6 +49,13 @@ def verify(october_stock, february_stock, october_driver, reference):
     require(reports[1]['packed_driver']['sha256'] == 'baaa1ee60d43ee6a67264bb05dfcb7da9948c386c05a9e7c6be4568408e957cd', 'February packed input differs')
     wrong, _ = analyze(february, driver)
     require(wrong['pairing']['status'] == 'unverified' and not wrong['patchable'], 'Cross-firmware pairing accepted')
+    if kernel_data is not None:
+        try:
+            analyze(february, driver, kernel=kernel_data)
+        except ValueError:
+            pass
+        else:
+            raise ValueError('Host reproduction did not refuse October native bytes for February')
     references = {}
     for kind, expected in (
         ('patch', 'fbfa6226cf8e364f2bda352cd9ef255f2e0ecfd5b61a7e2ee532ad3b82d354fb'),
@@ -58,7 +74,9 @@ def verify(october_stock, february_stock, october_driver, reference):
                      unpacked_driver_sha256=sha256(driver), open_hook_va=op['hook']['va'], touch_hook_va=touch['hook']['va']),
         february=dict(image_sha256=reports[1]['inventory']['image_sha256'],
                       packed_driver_sha256=reports[1]['packed_driver']['sha256'],
-                      native_validation='incomplete: exact verified unpacked input missing'),
+                      unpacked_driver_sha256=sha256(february_native) if february_native is not None else None,
+                      native_validation='reproduced host decoding and independent bounded landmarks pass; full proof incomplete'
+                                        if february_native is not None else 'not requested: supply --february-driver and --kernel'),
         cross_firmware_pairing='unverified, installable output refused', stable_reference_images=references,
     )
 
@@ -68,6 +86,9 @@ if __name__ == '__main__':
     parser.add_argument('--october-stock', required=True, type=Path)
     parser.add_argument('--february-stock', required=True, type=Path)
     parser.add_argument('--october-driver', required=True, type=Path)
+    parser.add_argument('--february-driver', type=Path)
+    parser.add_argument('--kernel', type=Path)
     parser.add_argument('--reference', type=Path, default=Path('dist/reference'))
     args = parser.parse_args()
-    print(json.dumps(verify(args.october_stock, args.february_stock, args.october_driver, args.reference), indent=2))
+    print(json.dumps(verify(args.october_stock, args.february_stock, args.october_driver, args.reference,
+                            args.february_driver, args.kernel), indent=2))

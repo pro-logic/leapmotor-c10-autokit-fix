@@ -11,9 +11,14 @@ installable images. Read [docs/PACKED_DRIVER_RESEARCH.md](docs/PACKED_DRIVER_RES
 for the February code-block dependency and decoder-prefix simulation limits.
 Read [docs/SEMANTIC_ANALYSIS.md](docs/SEMANTIC_ANALYSIS.md) for the newer bounded
 CFG/data-flow checks and unmodified-path emulation; these do not grant generation.
+The later [docs/HOST_DECODING.md](docs/HOST_DECODING.md) supersedes the February
+input blocker: both exact ELFs now reproduce on the host with the audited local
+kernel snapshot, complete checksums and an independent ARM decoder comparison.
+Test-only in-memory hook experiments establish further ABI evidence; they are
+not audited generation plans or installable generic outputs.
 Do not promote a candidate match, insertion proposal, edited draft or matching unpack
-attestation into proof of compatibility. An exact February unpacked driver with
-verified provenance is still missing.
+attestation into proof of compatibility. Host decoding grants verified input
+pairing only when it is actually replayed; a saved receipt alone cannot do so.
 
 For the generic path, replace fixed pins only with explicit input pairing,
 semantic discovery, audited plans and independent validation. Hashes remain audit

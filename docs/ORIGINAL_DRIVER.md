@@ -1,5 +1,11 @@
 # Obtaining the exact original unpacked driver
 
+On the experimental generic branch, the later [host decoding route](HOST_DECODING.md)
+also reproduces the pinned October ELF and February's exact ELF from their own
+packed members, using a caller-supplied audited local kernel snapshot. It does
+not require live hardware. The manual hardware procedure below remains available
+for its original October-specific scope.
+
 Skip this if you already have the unpacked original with SHA-256
 `0fc23de27693c03455f42b9904df89cff7fc8dccb990f3edfa27c40aea41faee`.
 

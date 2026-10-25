@@ -129,7 +129,8 @@ def channel_routes(graph, touch):
         return dict(status='unsupported', reason='Need unique dominating channel stack store')
     store, offset = stores[0]
     prior = preceding(graph, store, 1)
-    if len(prior) != 1 or prior[0].mnemonic != 'cmp.w' or not prior[0].op_str.startswith('sl, #'):
+    phase = touch.get('action_register', 'sl')
+    if len(prior) != 1 or prior[0].mnemonic not in ('cmp', 'cmp.w') or not prior[0].op_str.startswith(phase + ', #'):
         return dict(status='unsupported', reason='Unsupported channel join')
     join = prior[0].address
     routes = []
@@ -169,6 +170,7 @@ def channel_routes(graph, touch):
                       and graph.dominates(v, hook)]
     return dict(status='checked bounded routing' if not sp_writes else 'unsupported',
                 channel_store_va=store, join_va=join, channel_stack_offset=offset,
+                action_register=phase,
                 selector_load_va=selector_loads[0] if len(selector_loads) == 1 else None,
                 selector_setup_va=preceding(graph, selector_loads[0], 1)[0].address if len(selector_loads) == 1 else None,
                 output_pointer_stack_offset=int(graph.nodes[start + 6].op_str.split('#')[1].split(']')[0], 0),

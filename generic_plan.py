@@ -17,6 +17,9 @@ SOURCES = ('generic.py', 'generic_inventory.py', 'generic_analysis.py',
            'generic_flow.py', 'generic_semantics.py', 'generic_geometry.py',
            'verify_semantics.py', 'tests/generic_arm.py', 'tests/test_generic_flow.py',
            'generic_packing.py', 'generic_plan.py', 'firmware.py', 'runtime_scripts.py',
+           'generic_unpack.py',
+           'verify_host_unpack.py', 'tests/test_generic_unpack.py',
+           'verify_native_experiment.py', 'tests/native_experiment.py',
            'driver_layout.py', 'driver_patch.py', 'package_overlay.py',
            'verify_packing.py', 'verify_generic.py', 'verify_driver.py',
            'tests/arm_harness.py', 'tests/test_generic.py', 'tests/test_generic_proof.py',
@@ -117,6 +120,10 @@ def insertion_layout(data, code_bytes=4096, state_bytes=32):
 def draft_plan(report, files, driver=None):
     """Inventory plus candidate sites and explicit empty mandatory proof slots."""
     native = report.get('native', {})
+    if native and driver is None:
+        raise ValueError('Native bytes are required to bind a draft containing native analysis')
+    if driver is not None and native.get('sha256') != sha256(driver):
+        raise ValueError('Native analysis identity does not match draft input')
     hooks = []
     for role in ('open', 'touch'):
         for candidate in native.get(role + '_candidates', []):

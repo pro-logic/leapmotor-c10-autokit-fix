@@ -1,5 +1,9 @@
 # Exact February packed-driver investigation
 
+Later result: [HOST_DECODING.md](HOST_DECODING.md) resolves the exact February
+decoding dependency with the audited host CBC/LZMA/filter route. This document
+retains the earlier partial-decoding observations and limits as historical evidence.
+
 25 October 2026. Evidence is host partial decoding and bounded decoder-prefix
 emulation. No hardware was contacted, no AES plaintext was fabricated, and no
 complete February unpacked ELF or installable generic image was produced.

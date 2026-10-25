@@ -40,6 +40,13 @@ Expected SHA-256:
 
 ## Python dependencies
 
+The experimental host decoder also consults UPX v3.96's format/filter sources
+(`src/filter/ct.h`, `src/p_unix.cpp`, `src/packhead.cpp`) for interoperability.
+Its Python operand arithmetic is independently expressed; no UPX source/tool is
+vendored. The kernel snapshot needed for the audited CBC recipe is separately
+held vendor/capture input and is not included. See [docs/HOST_DECODING.md](docs/HOST_DECODING.md)
+for exact source/capture identities, method and independent decoding evidence.
+
 Cryptography, Keystone Engine, Capstone, pyelftools and Unicorn are installed
 separately using requirements.txt; none are vendored in this repository. Their
 own licences apply. The build performs assembly, disassembly and emulation on

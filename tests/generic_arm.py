@@ -173,20 +173,26 @@ def open_copy(data, candidate, fields, length):
     return m, before
 
 
-def touch_dispatch(data, candidate, evidence, selector, raw_action, pointer, x, y, initializer):
+def touch_dispatch(data, candidate, evidence, selector, raw_action, pointer, x, y, initializer, initial_state=None, machine=None):
     routing = evidence['routing']
     variable = next(e['variable_va'] for r in routing['routes'] for e in r['selector_edges'] if e['variable_va'] is not None)
     if routing['selector_setup_va'] is None:
         raise ValueError('No unique touch selector setup')
-    m = Machine(data)
+    m = Machine(data) if machine is None else machine
+    if initial_state is not None:
+        m.word(*initial_state)
     m.reg(UC_ARM_REG_R0, m.stack + routing['output_pointer_stack_offset'] - 16)
+    m.reg(UC_ARM_REG_LR, m.stop | 1)
     m.run(initializer, (m.stop,))  # execute actual packet initializer
     m.reg(UC_ARM_REG_SP, m.stack)
     m.word(variable, selector)
     m.write(m.payload, bytes(4) + struct.pack('<ii', x, y) + bytes(4))
     m.reg(UC_ARM_REG_R4, m.payload)
     m.reg(UC_ARM_REG_R5, pointer)
-    m.reg(UC_ARM_REG_R10, raw_action)
+    action_reg = {'sl': UC_ARM_REG_R10, 'r7': UC_ARM_REG_R7}.get(candidate.get('action_register', 'sl'))
+    if action_reg is None:
+        raise ValueError('Unsupported independently exercised action register')
+    m.reg(action_reg, raw_action)
     # Change flags without switching register banks (especially the saved SP).
     m.reg(UC_ARM_REG_CPSR, (m.reg(UC_ARM_REG_CPSR) & 0x07ffffff) | 0xa8000000)
     m.initial_rw = m.rw_snapshot()

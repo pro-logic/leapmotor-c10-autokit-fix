@@ -4,6 +4,7 @@ Reports code-level contracts and unresolved interprocedural assumptions. These
 are supporting evidence, not a complete ABI proof or permission to generate.
 """
 import struct
+import re
 
 from generic_analysis import matches
 from generic_flow import linear, preceding, plt_import
@@ -22,18 +23,20 @@ def response(graph, xref):
     if not matches(before[:4], [('add', 'r0, sp, #4'), ('movs', 'r1, #0x1c'),
                                ('movs', 'r3, #1'), ('str', 'r3, [sp, #0xc]')]) or before[4].mnemonic != 'bl':
         return None
-    if not matches(block[1:9], [('ldr', 'r4, [sp, #0x14]'), ('ldm', 'r5!, {r0, r1, r2, r3}'),
+    if not matches(block[1:8], [('ldr', 'r4, [sp, #0x14]'), ('ldm', 'r5!, {r0, r1, r2, r3}'),
             ('stm', 'r4!, {r0, r1, r2, r3}'), ('ldm.w', 'r5, {r0, r1, r2}'),
-            ('stm.w', 'r4, {r0, r1, r2}'), ('mov', 'r0, r6'), ('add', 'r1, sp, #4'), ('movs', 'r2, #0')]):
+            ('stm.w', 'r4, {r0, r1, r2}'), ('mov', 'r0, r6'), ('add', 'r1, sp, #4')]):
         return None
-    if not block[0].op_str.startswith('r5, [pc, #') or block[9].mnemonic != 'bl':
+    send_index = 9 if matches(block[8:9], [('movs', 'r2, #0')]) else 8
+    if not block[0].op_str.startswith('r5, [pc, #') or block[send_index].mnemonic != 'bl':
         return None
     initializer = min(graph.calls, key=lambda c: c['va'])
     return dict(function_entry=graph.start, source_xref_va=start, source_va=xref['pointer_va'],
                 initializer_target=initializer['target'],
                 size=28, message_type=1, resize_call_va=before[4].address,
                 resize_target=before[4].operands[0].imm, copy_start_va=block[2].address,
-                send_call_va=block[9].address, send_target=block[9].operands[0].imm,
+                send_call_va=block[send_index].address, send_target=block[send_index].operands[0].imm,
+                send_extra_zero_argument=send_index == 9,
                 scope='28-byte effective Open copy after type1/length28 object setup')
 
 
@@ -127,39 +130,77 @@ def hu_screen(graph, xref):
     aliases = [va for va, i in graph.nodes.items() if i.mnemonic == 'mov' and i.op_str == 'r6, sb'
                and graph.dominates(xref['site']['va'], va)]
     copies, writers = [], []
-    expected = [('ldr', 'r3, [r6]'), ('add', 'r1, sp, #0x10'), ('movs', 'r2, #0x18'),
-                ('str', 'r3, [r4]'), ('ldr', 'r3, [r6, #4]'), ('str', 'r3, [r4, #4]'),
-                ('ldr', 'r3, [sp, #8]'), ('str', 'r3, [r4, #8]'), ('ldr', 'r3, [sp, #0xc]'),
-                ('str', 'r3, [r4, #0xc]'), ('ldr', 'r3, [r6, #8]'), ('str', 'r3, [r4, #0x10]'),
-                ('str', 'r0, [r4, #0x14]')]
     for va in graph.nodes:
-        if matches(linear(graph, va, len(expected)), expected) and any(graph.dominates(a, va) for a in aliases):
-            copies.append(va)
+        copied = hu_copy(graph, va)
+        if copied and any(graph.dominates(a, va) for a in aliases):
+            copies.append(copied)
         seq = linear(graph, va, 4)
         if (len(seq) == 4 and seq[0].mnemonic == 'ldr' and seq[0].op_str.startswith('r0, [pc, #')
-                and matches(seq[1:3], [('mov', 'r1, r4'), ('movs', 'r2, #0x18')]) and seq[3].mnemonic == 'bl'):
+                and seq[2].mnemonic == 'movs' and seq[2].op_str == 'r2, #0x18' and seq[3].mnemonic == 'bl'):
             try:
                 if graph.driver.read(value(graph.driver, seq[0]), 15) == b'HU_SCREEN_INFO\0':
                     writers.append(seq)
             except ValueError:
                 pass
-    if len(copies) != 1 or len(writers) != 1 or not graph.dominates(copies[0], writers[0][0].address):
+    if len(copies) != 1 or len(writers) != 1:
         return None
-    aliases = [va for va in aliases if graph.dominates(va, copies[0])]
+    copied, seq = copies[0], writers[0]
+    if not graph.dominates(copied['start'], seq[0].address):
+        return None
+    base, offset = copied['base'], copied['offset']
+    expected_pointer = f'r1, {base}' if offset == 0 else f'r1, {base}, #{hex(offset)}'
+    if (seq[1].mnemonic != ('mov' if offset == 0 else 'add') or seq[1].op_str != expected_pointer):
+        return None
+    aliases = [va for va in aliases if graph.dominates(va, copied['start'])]
     if len(aliases) != 1:
         return None
-    between = graph.reachable_from(aliases[0]) & graph.reaching(copies[0])
+    between = graph.reachable_from(aliases[0]) & graph.reaching(copied['start'])
     if any(va != aliases[0] and any(graph.cs.reg_name(r) == 'r6' for r in ins.regs_access()[1])
            for va, ins in graph.nodes.items() if va in between):
         return None
-    seq = writers[0]
-    copy = linear(graph, copies[0], len(expected))
     return dict(function_entry=graph.start, source_xref_va=xref['site']['va'], source_va=xref['pointer_va'],
-                source_alias_va=aliases[0], copy_start_va=copies[0], write_setup_va=seq[0].address,
-                copy_end_va=copy[-1].address + copy[-1].size,
+                source_alias_va=aliases[0], copy_start_va=copied['start'], write_setup_va=seq[0].address,
+                copy_end_va=copied['end'], output_base_register=base, output_base_offset=offset,
                 write_call_va=seq[3].address, write_target=seq[3].operands[0].imm,
                 record_size=24, width_offset=0, height_offset=4, fps_offset=16,
                 scope='effective dimensions flow into named HU_SCREEN_INFO record before write call')
+
+
+def hu_copy(graph, start):
+    """Track six ordered field stores with either register or stack destinations."""
+    ins = graph.nodes[start]
+    if ins.mnemonic != 'ldr' or ins.op_str != 'r3, [r6]':
+        return None
+    tags, stores, location = {'r0': 'dynamic'}, [], None
+    expected = ['width', 'height', 'meta0', 'meta1', 'fps', 'dynamic']
+    for _ in range(18):
+        if ins.mnemonic == 'ldr':
+            loads = {'r3, [r6]': 'width', 'r3, [r6, #4]': 'height', 'r3, [r6, #8]': 'fps',
+                     'r3, [sp, #8]': 'meta0', 'r3, [sp, #0xc]': 'meta1'}
+            if ins.op_str not in loads:
+                return None
+            tags['r3'] = loads[ins.op_str]
+        elif ins.mnemonic == 'str':
+            match = re.fullmatch(r'(r0|r3), \[(r[0-9]+|sp)(?:, #(0x[0-9a-f]+|[0-9]+))?\]', ins.op_str)
+            if not match or match[2] in ('r0', 'r3', 'r6'):
+                return None
+            base, offset = match[2], int(match[3], 0) if match[3] else 0
+            if location is None:
+                location = base, offset
+            if (base, offset) != (location[0], location[1] + 4 * len(stores)) or tags.get(match[1]) != expected[len(stores)]:
+                return None
+            stores.append(tags[match[1]])
+            if len(stores) == 6:
+                return dict(start=start, end=ins.address + ins.size, base=location[0], offset=location[1])
+        elif not ((ins.mnemonic == 'movs' and ins.op_str == 'r2, #0x18')
+                  or (ins.mnemonic == 'add' and ins.op_str.startswith('r1, sp, #'))
+                  or (ins.mnemonic == 'mov' and ins.op_str.startswith('r1, r'))):
+            return None
+        following = ins.address + ins.size
+        if following not in graph.edges[ins.address] or following not in graph.nodes:
+            return None
+        ins = graph.nodes[following]
+    return None
 
 
 def geometry_consumers(context, xrefs):

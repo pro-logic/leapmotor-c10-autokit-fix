@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import struct
+import re
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
 from elftools.elf.elffile import ELFFile
@@ -167,34 +168,53 @@ def touch_candidates(driver):
         # Coprocessor load family seed, followed by independently decoded flow.
         if text[offset + 1] != 0xed:
             continue
-        ins = list(driver.cs.disasm(text[offset:offset + 54], start + offset))
+        ins = list(driver.cs.disasm(text[offset:offset + 64], start + offset))
         if len(ins) < 15:
             continue
+        size = re.fullmatch(r'(r[0-9]+|ip|lr), #0x18', ins[1].op_str)
+        kind = re.fullmatch(r'(r[0-9]+|ip|lr), #0xb', ins[3].op_str)
+        action = re.fullmatch(r'r5, (r[0-9]+|sl|sb|fp), r5, lsl #8', ins[4].op_str)
+        if (not size or not kind or not action or ins[1].mnemonic not in ('movs', 'mov.w')
+                or ins[3].mnemonic not in ('movs', 'mov.w') or size[1] == kind[1]
+                or {size[1], kind[1]} & {'r3', 'r4', 'r5'} or action[1] in {size[1], kind[1], 'r3', 'r4', 'r5'}):
+            continue
+        # STM stores registers in numeric order; header length must precede type.
+        registers = {f'r{i}': i for i in range(13)} | {'ip': 12, 'lr': 14}
+        if size[1] not in registers or kind[1] not in registers or registers[size[1]] >= registers[kind[1]]:
+            continue
+        extra = 1 if ins[9].mnemonic == 'ldr.w' and ins[9].op_str == 'r0, [sb]' else 0
+        literal_index = 9 + extra
+        if len(ins) < 15 + extra:
+            continue
         expected = [
-            ('vldr', 's15, [r4, #4]'), ('movs', 'r2, #0x18'),
-            (ins[2].mnemonic, ins[2].op_str), ('mov.w', 'lr, #0xb'),
-            ('orr.w', 'r5, sl, r5, lsl #8'), ('vldr', 's14, [r4, #8]'),
-            ('stm.w', 'r3, {r2, lr}'), ('str', 'r5, [r3, #0x18]'),
-            ('vcvt.f64.s32', 'd6, s15'), (ins[9].mnemonic, ins[9].op_str),
-            ('vcvt.f64.s32', 'd7, s14'), ('vdiv.f64', 'd6, d6, d5'),
-            ('vdiv.f64', 'd7, d7, d5'), ('vstr', 'd6, [r3, #8]'),
-            ('vstr', 'd7, [r3, #0x10]'),
+            ('vldr', 's15, [r4, #4]'), (ins[1].mnemonic, ins[1].op_str),
+            (ins[2].mnemonic, ins[2].op_str), (ins[3].mnemonic, ins[3].op_str),
+            ('orr.w', ins[4].op_str), ('vldr', 's14, [r4, #8]'),
+            ('stm.w', f'r3, {{{size[1]}, {kind[1]}}}'), ('str', 'r5, [r3, #0x18]'),
+            ('vcvt.f64.s32', 'd6, s15'),
         ]
+        if extra:
+            expected.append(('ldr.w', 'r0, [sb]'))
+        expected.extend([(ins[literal_index].mnemonic, ins[literal_index].op_str),
+            ('vcvt.f64.s32', 'd7, s14'), ('vdiv.f64', 'd6, d6, d5'),
+            ('vdiv.f64', 'd7, d7, d5'), ('vstr', 'd6, [r3, #8]'), ('vstr', 'd7, [r3, #0x10]')])
         if not matches(ins, expected):
             continue
         if ins[2].mnemonic != 'ldr' or not ins[2].op_str.startswith('r3, [sp, #'):
             continue
-        if ins[9].mnemonic != 'vldr' or not ins[9].op_str.startswith('d5, [pc, #'):
+        if ins[literal_index].mnemonic != 'vldr' or not ins[literal_index].op_str.startswith('d5, [pc, #'):
             continue
         try:
-            divisor = driver.literal(ins[9])
+            divisor = driver.literal(ins[literal_index])
             if struct.unpack('<d', driver.read(divisor, 8))[0] != 10000.0:
                 continue
         except ValueError:
             continue
         results.append(dict(
             hook=driver.site(ins[5]), normalization_start_va=ins[0].address,
-            normalization_end_va=ins[14].address + ins[14].size,
+            normalization_end_va=ins[14 + extra].address + ins[14 + extra].size,
+            size_register=size[1], type_register=kind[1], action_register=action[1],
+            scheduled_integer_load_va=ins[9].address if extra else None,
             divisor_va=divisor, divisor=10000, evidence=[
                 'distinct X/Y integer loads feed signed conversions and double division by literal 10000',
                 'normalized X/Y written at output+8/+16, size24/type11 header',
@@ -211,7 +231,7 @@ def analyze_driver(data):
     from generic_semantics import analyze_semantics
     return dict(
         sha256=sha256(data), bytes=len(data), entry=driver.elf['e_entry'], loads=driver.loads,
-        candidate_grammar='restricted October-like Thumb data flow; other compiler shapes unsupported',
+        candidate_grammar='restricted Thumb data flow with checked register allocation/scheduling roles; other shapes unsupported',
         open_candidates=opens, touch_candidates=touches,
         unique_candidates=len(opens) == len(touches) == 1,
         semantic_evidence=analyze_semantics(driver, opens, touches),

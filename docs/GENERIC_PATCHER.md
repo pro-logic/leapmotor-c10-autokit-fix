@@ -20,6 +20,7 @@ Use the existing `.venv` described in the main README. From the repository:
 .\.venv\Scripts\python.exe generic.py analyze --stock inputs/A15W_Update_2025.10.15.1127.img --driver inputs/ARMadb-driver.unpacked
 .\.venv\Scripts\python.exe generic.py analyze --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img
 .\.venv\Scripts\python.exe generic.py extract-driver --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img
+.\.venv\Scripts\python.exe generic.py unpack-driver --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img --kernel ../CPC200-CCPA_resources/custom/kernel_dumps/kernel_ram_dump_0x80008000.bin
 .\.venv\Scripts\python.exe generic.py draft-plan --stock inputs/A15W_Update_2025.10.15.1127.img --driver inputs/ARMadb-driver.unpacked
 ```
 
@@ -39,11 +40,38 @@ report, including an incomplete/refusal report; inspect `patchable`, which is
 always false in this checkpoint. Invalid archives fail before output creation.
 `extract-driver` extracts packed bytes only. Analysis now inspects the observed
 packed format and partially decodes plaintext blocks on the host; it cannot
-decode the encrypted executable block or supply an exact February ELF.
+decode the encrypted executable block without the explicit audited `--kernel`
+input. That host route now reproduces both exact native ELFs; see below.
 `draft-plan` writes a source/input-bound incomplete proof draft. None of these
 commands connects to a device, executes vendor code, or installs firmware.
 
-## February decoding investigation and proof drafts
+## Current host decoding and native experiments
+
+[HOST_DECODING.md](HOST_DECODING.md) records the resolved February input and
+supersedes the earlier decoding blocker. A software CBC recipe recovered from
+an already-held kernel snapshot reproduces October's entire hardware export and
+decodes February's own exact packed member with both UPX checksums enforced.
+An independent emulated ARM LZMA backend agrees on both code blocks.
+
+The decoded February ELF is 469516 bytes, SHA-256
+`a9fb4ed7aef64a5a7a9cbc221582bcb2716421fc19904a5eafba2e57c6d09eba`.
+Use `unpack-driver --kernel ...` to save a new ignored `host-unpack/` directory,
+or `analyze/draft-plan --kernel ...` to reproduce and verify the native pairing.
+A supplied `--driver` must match the reconstruction exactly. No kernel bytes,
+key values or vendor executables are bundled in source. No hardware was accessed.
+
+Recognition now handles observed register/scheduling differences, two/three
+argument sender shapes and checked register/stack HU field stores. Both inputs
+have independently checked Open, touch and all four geometry consumers.
+Original-path dispatch emulation passes 432 October and 360 February cases.
+In-memory native hook fixtures also pass preservation and Open/Show sequence
+checks; they expose no experimental ELF/update export command. Production
+generation remains disabled until full proof and audited-plan gates are met.
+
+## Earlier partial decoding investigation and proof drafts
+
+The following paragraphs describe the earlier checkpoint; the encrypted-block
+and missing-February-ELF limits were resolved by the host route above.
 
 The continuation reverified February's extracted packed member byte for byte
 against the hashed genuine image. It identified the actual obfuscated UPX
@@ -162,25 +190,22 @@ behavior, not compatibility with a second native firmware layout.
 
 | Input | Image SHA-256 | Packed driver SHA-256 | Native status |
 | --- | --- | --- | --- |
-| February `2025.02.25.1521` | `5c00b2e47aca6efc15625a1887ed857b1dceac691ff9dde96ac7de2f00adf8f8` | `baaa1ee60d43ee6a67264bb05dfcb7da9948c386c05a9e7c6be4568408e957cd` | Exact verified unpacked ELF missing |
+| February `2025.02.25.1521` | `5c00b2e47aca6efc15625a1887ed857b1dceac691ff9dde96ac7de2f00adf8f8` | `baaa1ee60d43ee6a67264bb05dfcb7da9948c386c05a9e7c6be4568408e957cd` | Exact ELF reproduced by checked host decode; see later host checkpoint |
 | October `2025.10.15.1127` | `24589f1b71b95d87379ee2a10e130e939cd45c28bcd3ec328499f5bbd2bc477e` | `614fa754065dcecd7465bfdc283d551abdc0c1d630c9c0c76b520a4272867cdb` | Stable reference reproduced; static candidates found |
 
 The local research ELF with SHA-256
 `b86533cad6096311874f26281871d258ca289b23ebc36148a6a1d5e543d5ef46`
 has no established February pairing. Static analysis found one Open candidate
 and zero supported touch candidates. It is retained only as an unverified
-research input outside the repository. It must not replace February's missing
-exact export. No hardware access or hardware decoding was attempted.
+research input outside the repository. It must not replace February's exact
+host-decoded export. No hardware access or hardware decoding was attempted.
 
 ## Remaining work
 
-1. Decode the exact extracted February packed file and establish its provenance:
-   packed hash, unpacked hash and reproducible export method together. Read
-   [ORIGINAL_DRIVER.md](ORIGINAL_DRIVER.md) and [../THIRD_PARTY.md](../THIRD_PARTY.md).
-   The current export helper only supports the installed original October
-   driver. Its hardware-aware tool is not ordinary desktop UPX, and using it on
-   an arbitrary extracted input remains untested. Do not flash an older image
-   or execute the extracted driver just to obtain this prerequisite.
+1. Preserve/reproduce both host-decoded inputs and provenance when changing the
+   decoder or kernel recipe. Exact February decoding is now complete; do not
+   substitute the unverified research ELF or use the installed-October exporter
+   as a generic exporter. See [HOST_DECODING.md](HOST_DECODING.md).
 2. Complete functional semantic proofs, including downstream consumers and AA
    channel/ABI facts. Independently verify each real native layout. Add broader
    compiler shapes deliberately; one familiar format or instruction is not proof.
