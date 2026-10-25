@@ -8,6 +8,8 @@ from pathlib import Path
 from firmware import sha256
 from generic_analysis import analyze_driver
 from generic_inventory import MAX_IMAGE, inventory
+from generic_packing import inspect_packed
+from generic_plan import draft_plan
 from runtime_scripts import STOCK_SHA, PACKED_SHA, START, DAEMON
 from driver_layout import SOURCE_SHA
 
@@ -57,7 +59,7 @@ def analyze(image, driver=None, receipt=None):
         inventory=stock, c10_profile=C10_PROFILE, patchable=False, hardware_tested=False,
         packed_driver=dict(bytes=len(packed), sha256=sha256(packed),
                            upx_marker_present=b'UPX!' in packed,
-                           decoding='not performed; marker alone does not identify encryption or packing'),
+                           decoding='complete native decoding not performed; see bounded structure inspection'),
         startup_analysis=dict(
             start_custom_init_anchor_count=files[START[2:]].count(b'#run custom init shell\n'),
             start_logging_anchor_count=files[START[2:]].count(b'\tif [ -e /etc/log_com ]; then'),
@@ -66,6 +68,11 @@ def analyze(image, driver=None, receipt=None):
         ),
         blockers=[],
     )
+    try:
+        report['packed_driver']['structure'] = inspect_packed(packed)
+    except ValueError as error:
+        report['packed_driver']['structure'] = dict(status='unsupported', reason=str(error),
+                                                    complete_native_input=False, patchable=False)
     if driver is None:
         if receipt is not None:
             raise ValueError('--provenance requires --driver')
@@ -88,11 +95,11 @@ def analyze(image, driver=None, receipt=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('analyze', 'extract-driver'))
+    parser.add_argument('command', choices=('analyze', 'extract-driver', 'draft-plan'))
     parser.add_argument('--stock', required=True, type=Path)
     parser.add_argument('--driver', type=Path, help='Candidate exact unpacked ELF; never substitutes another input')
     parser.add_argument('--provenance', type=Path, help='Optional unpack attestation; hash binding is not verification')
-    parser.add_argument('--output', type=Path, help='New report file, or NEW directory for extract-driver')
+    parser.add_argument('--output', type=Path, help='New report/draft file, or NEW directory for extract-driver')
     args = parser.parse_args()
     try:
         if args.command == 'extract-driver' and (args.driver or args.provenance):
@@ -115,11 +122,12 @@ def main():
             (output / 'request.json').write_text(json.dumps(request, indent=2) + '\n', encoding='utf-8')
             print(json.dumps(request, indent=2))
         else:
-            output = args.output or base / 'analysis.json'
+            artifact = draft_plan(report, files, driver) if args.command == 'draft-plan' else report
+            output = args.output or base / ('proof-draft.json' if args.command == 'draft-plan' else 'analysis.json')
             output.parent.mkdir(parents=True, exist_ok=True)
             # Refuse overwrite, including --output pointing at either input.
             with output.open('x', encoding='utf-8') as stream:
-                stream.write(json.dumps(report, indent=2) + '\n')
+                stream.write(json.dumps(artifact, indent=2) + '\n')
             print(json.dumps(dict(report=str(output.resolve()), status=report['status'],
                                   patchable=False, blockers=report['blockers']), indent=2))
     except (ValueError, OSError) as error:

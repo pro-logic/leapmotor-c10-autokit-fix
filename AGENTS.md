@@ -5,8 +5,11 @@
 On `feature/generic-firmware-patcher`, read [docs/GENERIC_PATCHER.md](docs/GENERIC_PATCHER.md)
 first. Stable `main` remains at `6f8cb63085c8e0d650f7f33776819b0b20645d5e`.
 Keep `build.py` and its validated single-firmware path intact. The new `generic.py`
-currently inventories inputs and reports restricted native candidates; it cannot
-emit installable images. Do not promote a candidate match or a matching unpack
+currently inventories inputs, partially decodes plaintext packed extents and
+reports restricted native candidates/incomplete proof drafts; it cannot emit
+installable images. Read [docs/PACKED_DRIVER_RESEARCH.md](docs/PACKED_DRIVER_RESEARCH.md)
+for the February code-block dependency and decoder-prefix simulation limits.
+Do not promote a candidate match, insertion proposal, edited draft or matching unpack
 attestation into proof of compatibility. An exact February unpacked driver with
 verified provenance is still missing.
 

@@ -20,6 +20,7 @@ Use the existing `.venv` described in the main README. From the repository:
 .\.venv\Scripts\python.exe generic.py analyze --stock inputs/A15W_Update_2025.10.15.1127.img --driver inputs/ARMadb-driver.unpacked
 .\.venv\Scripts\python.exe generic.py analyze --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img
 .\.venv\Scripts\python.exe generic.py extract-driver --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img
+.\.venv\Scripts\python.exe generic.py draft-plan --stock inputs/A15W_Update_2025.10.15.1127.img --driver inputs/ARMadb-driver.unpacked
 ```
 
 Sibling workspace paths above describe these local samples, not a required
@@ -36,8 +37,42 @@ Reports and extraction directories refuse overwrite. Use another `--output`
 to retain repeated analyses. `analyze` exits successfully when it creates a
 report, including an incomplete/refusal report; inspect `patchable`, which is
 always false in this checkpoint. Invalid archives fail before output creation.
-`extract-driver` extracts packed bytes only. Neither command connects to a
-device, executes vendor code, installs firmware, or decodes the packed driver.
+`extract-driver` extracts packed bytes only. Analysis now inspects the observed
+packed format and partially decodes plaintext blocks on the host; it cannot
+decode the encrypted executable block or supply an exact February ELF.
+`draft-plan` writes a source/input-bound incomplete proof draft. None of these
+commands connects to a device, executes vendor code, or installs firmware.
+
+## February decoding investigation and proof drafts
+
+The continuation reverified February's extracted packed member byte for byte
+against the hashed genuine image. It identified the actual obfuscated UPX
+container and host-decoded the original headers, writable bytes and file gaps.
+The 204149-byte code block remains unresolved. Independent disassembly and
+bounded ARM decoder-prefix simulation observe a `/dev/hwaes` ioctl request for
+that exact input; no syscall was sent to hardware or invented plaintext returned.
+See [PACKED_DRIVER_RESEARCH.md](PACKED_DRIVER_RESEARCH.md) for all identities,
+source/tool provenance, commands, evidence and precise missing dependency.
+
+`generic_plan.py` now derives a conservative two-LOAD insertion proposal from
+complete ELF mappings. Relocated fixtures and independent October annotations
+check the arithmetic. Drafts bind original image/packed/native/script and
+implementation hashes, candidate hook bytes/sites and required proof slots.
+Mandatory proofs remain unproved; drafts are not audited generation plans.
+`validate_draft` recomputes the whole draft and rejects edits/stale sources or
+inputs. It always returns `generation_allowed=False`. No apply/build API exists.
+
+`verify_packing.py` pins real fixture annotations independently, compares all
+plaintext October extents with the existing exact hardware export and simulates
+only the decoder-prefix mmap/open/ioctl path. It records Python/Unicorn/decoder,
+implementation, unpacker and downloaded source hashes. This is distinct from
+full native functional emulation, shell simulation and hardware evidence.
+
+The continuation's 22 source tests and both real-input verifiers pass. Fresh
+packing analyses and proof drafts are retained beside the earlier reports; the
+packing verifier is under ignored `dist/generic/research-20261025/`. Stable
+source and reference artifacts remain unchanged. Full functional proofs,
+new generation and paired generic installers remain incomplete.
 
 ## Implemented boundaries
 
