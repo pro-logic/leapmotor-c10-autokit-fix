@@ -3,8 +3,11 @@
 25 October 2026. **The exact February native input is now reproducible on the
 host.** This supersedes the decoding blocker recorded in the earlier packing
 and semantic checkpoints. No device access or new hardware capture was needed.
-Generic installable-image generation remains disabled pending the remaining
-proof and packaging gates.
+The no-generation and remaining-work statements below describe this historical
+checkpoint. The later recognized-layout builder and its finite compatibility
+contract are documented in [GENERIC_PATCHER.md](GENERIC_PATCHER.md), including a
+read-only command for rechecking its saved experimental pairs. That later work
+does not turn decoding evidence into complete semantic or hardware proof.
 
 The subsequent [message-CFB checkpoint](MESSAGE_CRYPTO.md) establishes conditional
 Open preprocessing/key/IV evidence and an inactive-state plaintext counterexample

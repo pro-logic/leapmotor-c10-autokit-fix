@@ -2,6 +2,10 @@
 
 Local checkpoint: 26 October 2026, Australia/Sydney.
 
+31 October continuation: the scheduled handover predates the delivered builder.
+The checkout and existing candidates are preserved. The read-only saved-build
+audit below rechecks those candidates without enabling another generation path.
+
 ## Build a recognized-layout patch and paired unpatch
 
 The user requested a practical working builder in place of open-ended exhaustive
@@ -100,6 +104,41 @@ These are newly generated stock-specific experimental installers. No hardware
 installation occurred. `dist/generic/delivery-20261026/final-run/` retains the
 public command logs and `delivery-summary.json`; the commit-bound summary adds
 the local source commit, agreement of all 65 source files and artifact hashes.
+
+## Recheck a saved candidate without rebuilding it
+
+`verify_generic_saved.py` opens the existing plan, generated native file and both
+encrypted archives. It reproduces the exact packed-to-native decode, recomputes
+the native contract, checks ELF preservation and actual native behavior, derives
+the expected payloads from the supplied stock, and independently decrypts both
+saved archives. It checks each archive's plan binding and exact rollback bytes.
+It writes evidence only; no replacement driver or update image is exported.
+
+```powershell
+.\.venv\Scripts\python.exe verify_generic_saved.py --stock ../CPC200-CCPA_resources/carlinkit/firmware_stock/A15W_Update_2025.02.25.1521.img --kernel ../CPC200-CCPA_resources/custom/kernel_dumps/kernel_ram_dump_0x80008000.bin --build dist/generic/2025.02.25.1521-5c00b2e47aca/recognized-build-20261026 --shell-tests --output dist/generic/my-saved-february-audit
+```
+
+The evidence directory must be new and outside the saved candidate. With
+`--shell-tests`, the actual saved pair runs through the disposable Linux installer
+matrix, and its stock-derived runtime runs through the process/signal matrix.
+Without it, the new report says shell checks were **not rerun**; a historical
+`PASS` is never promoted into current evidence. The saved validation file is
+hashed for reference, not consumed as proof of native or shell behavior.
+
+All sources recorded by the build must still match. To audit the earlier
+65-file delivery, the only permitted additions are this new verifier and its
+source-only test; their names are explicitly listed in the new report, and the
+inventories are reported as different. Other source additions, removals or edits
+refuse. This exception is confined to read-only verification; build plans and
+the builder's source checks retain their existing exact comparison behavior.
+
+The audit preserves the same finite compatibility contract as the builder.
+Static discovery and emulation do not complete arbitrary indirect-entry,
+ownership, concurrency or asynchronous-unwind proof. Host CBC supplies the AES
+operation in the separate packed ARM-decompressor check; that check is not
+hardware AES evidence. Neither firmware's experimental installer is newly
+hardware-tested, and February's need for the empirical C10 correction has not
+been established in a vehicle.
 
 ## Earlier analysis and research checkpoints
 
