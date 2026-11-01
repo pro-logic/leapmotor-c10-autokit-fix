@@ -30,17 +30,27 @@ release is listed, you will need to [build from source](docs/BUILDING.md).
 
 ## Install or remove
 
-1. Enable **Show Navigation Bar** in AutoKit and use **HD mode**.
-2. Put the patch image at the root of a USB stick as **`A15W_Update.img`**.
-   Keep only the selected update image on the stick and use the dongle's normal
-   USB update procedure, parked with stable power.
-3. Check **`C10_LOGS/INSTALLED.txt`** and **`C10_LOGS/install.log`** for success.
-   The updater screen alone does not confirm installation. Reboot the dongle.
-4. Test the picture and touch alignment after a full cold car/head-unit boot,
-   before pressing Show again.
+1. Use **HD mode** with **Show Navigation Bar** enabled in AutoKit.
+2. Prepare a USB stick formatted as **FAT32**. Formatting erases its contents,
+   so back up anything you need first. Extract the patch ZIP on your computer
+   and copy only **`A15W_Update.img`** to the stick's root.
+3. **Do the update in the car**, parked with stable power. With the dongle
+   connected and the **AutoLinkKit / AutoKit app open on the car screen**, plug
+   the USB stick into the **dongle's USB port**. The app should report
+   **"dongle updating"**. Wait for the update to finish; do not interrupt power.
+4. Once the update has finished, **unplug the USB stick**. This restarts the
+   dongle. Check **`C10_LOGS/INSTALLED.txt`** and **`C10_LOGS/install.log`** on the
+   stick for success; the updater screen alone does not confirm installation.
+5. You may need to press **Show Navigation Bar** (show bottom navigation) once
+   more after installation. Then **restart the infotainment system** and
+   reconnect Android Auto through the dongle. The picture should now have the
+   correct aspect ratio above the bottom navigation bar.
+6. Check picture and touch alignment after another full cold car/head-unit
+   boot, before pressing Show again.
 
 To remove the patch, repeat the update procedure using the matching **unpatch**
-image as `A15W_Update.img`, check the rollback receipt and reboot. It restores
+image as `A15W_Update.img` on a **FAT32** stick. Wait for the update to finish,
+remove the stick to restart the dongle, and check the rollback receipt. It restores
 replaced stock files and removes this project's helpers; it preserves settings
 and existing logs. It is not a factory reset.
 
